@@ -1,0 +1,328 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: llmservices.serving.hearth.dev
+spec:
+  group: serving.hearth.dev
+  names:
+    kind: LLMService
+    listKind: LLMServiceList
+    plural: llmservices
+    singular: llmservice
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.resolvedRuntime
+      name: Runtime
+      type: string
+    - jsonPath: .status.replicas
+      name: Replicas
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: LLMService is the Schema for the llmservices API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec defines the desired state of LLMService
+            properties:
+              cache:
+                description: cache configures model-weight caching — the key to usable
+                  scale-to-zero.
+                properties:
+                  prewarm:
+                    description: prewarm hydrates weights into the cache before first
+                      traffic.
+                    type: boolean
+                  size:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  strategy:
+                    default: NodeLocalPVC
+                    enum:
+                    - NodeLocalPVC
+                    - HostPath
+                    - SharedPVC
+                    - BakedImage
+                    - None
+                    type: string
+                type: object
+              endpoint:
+                description: endpoint configures the served API and cold-start client
+                  behavior.
+                properties:
+                  coldStart:
+                    description: ColdStartSpec controls what a client experiences
+                      while a model scales from zero.
+                    properties:
+                      heartbeatInterval:
+                        default: 10s
+                        type: string
+                      mode:
+                        default: keepalive
+                        description: |-
+                          mode is how cold requests are handled: keepalive (SSE heartbeats hold the
+                          connection) or reject (fast 503 + Retry-After for the client to retry).
+                        enum:
+                        - keepalive
+                        - reject
+                        type: string
+                    type: object
+                  openAICompatible:
+                    default: true
+                    type: boolean
+                type: object
+              model:
+                description: model selects the model to serve.
+                properties:
+                  catalogRef:
+                    description: catalogRef resolves source and defaults from a model
+                      catalog.
+                    type: string
+                  source:
+                    description: source specifies the model location explicitly.
+                    properties:
+                      secretRef:
+                        description: secretRef holds credentials for private sources
+                          (e.g. a ModelScope token).
+                        properties:
+                          name:
+                            default: ""
+                            description: |-
+                              Name of the referent.
+                              This field is effectively required, but due to backwards compatibility is
+                              allowed to be empty. Instances of this type with an empty value here are
+                              almost certainly wrong.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      uri:
+                        description: 'uri is the model location: hf:// | modelscope://
+                          | oci:// | s3:// | pvc://'
+                        type: string
+                    required:
+                    - uri
+                    type: object
+                type: object
+              resources:
+                description: resources declares the accelerator / CPU / memory request.
+                properties:
+                  accelerators:
+                    default: 1
+                    description: accelerators is the number of whole devices to request.
+                    format: int32
+                    type: integer
+                  cpu:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  fraction:
+                    description: fraction requests a sub-device slice; valid only
+                      when the runtime supports sharing.
+                    properties:
+                      cores:
+                        format: int32
+                        type: integer
+                      memory:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  memory:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                type: object
+              runtime:
+                description: runtime selects the backend — pinned by name or auto-picked
+                  by vendor preference.
+                properties:
+                  argsOverride:
+                    description: argsOverride appends to / overrides the runtime's
+                      serving args.
+                    items:
+                      type: string
+                    type: array
+                  name:
+                    description: name pins a specific InferenceRuntime.
+                    type: string
+                  selector:
+                    description: selector auto-picks among runtimes by vendor preference
+                      order.
+                    properties:
+                      vendor:
+                        description: vendor lists acceptable vendors in preference
+                          order.
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                type: object
+              scaling:
+                description: scaling configures scale-to-zero and queue-driven autoscaling.
+                properties:
+                  activationTimeout:
+                    default: 5m
+                    description: activationTimeout is how long the gateway buffers
+                      a request during cold start.
+                    type: string
+                  drainTimeout:
+                    default: 2m
+                    description: drainTimeout must be <= the runtime's terminationGracePeriodSeconds.
+                    type: string
+                  max:
+                    default: 1
+                    format: int32
+                    type: integer
+                  metric:
+                    default: queueDepth
+                    description: metric drives autoscaling.
+                    enum:
+                    - queueDepth
+                    - kvCacheUtil
+                    type: string
+                  min:
+                    default: 0
+                    description: min replicas; 0 enables scale-to-zero.
+                    format: int32
+                    type: integer
+                  scaleDownStabilization:
+                    default: 5m
+                    type: string
+                  target:
+                    default: 10
+                    description: target is the desired metric value per replica.
+                    format: int32
+                    type: integer
+                type: object
+            required:
+            - model
+            type: object
+          status:
+            description: status defines the observed state of LLMService
+            properties:
+              conditions:
+                description: conditions represent the current state of the LLMService
+                  resource.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              endpointURL:
+                description: endpointURL is the OpenAI-compatible base URL clients
+                  should call.
+                type: string
+              phase:
+                description: phase is a high-level summary of the service state.
+                enum:
+                - Pending
+                - Loading
+                - Ready
+                - ScaledToZero
+                - Degraded
+                type: string
+              replicas:
+                description: replicas is the current number of serving pods.
+                format: int32
+                type: integer
+              resolvedRuntime:
+                description: resolvedRuntime is the InferenceRuntime actually selected.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -8,6 +8,17 @@
 *.so
 *.dylib
 
+# Build output and locally-installed tooling (controller-gen, kustomize,
+# setup-envtest, the manager binary, etc.)
+bin/
+Dockerfile.cross
+
+# Distribution artifacts from `make build-installer` / helm packaging.
+# Ignore dist/ contents (not the dir itself) so the installer can be re-included.
+dist/*
+!dist/install.yaml
+*.tgz
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -24,9 +35,17 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Local env and cluster credentials — never commit these
 .env
+*.kubeconfig
+kubeconfig
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*~

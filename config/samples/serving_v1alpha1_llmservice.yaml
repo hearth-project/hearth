@@ -1,0 +1,35 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: LLMService
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: qwen3-8b
+spec:
+  model:
+    source:
+      uri: modelscope://Qwen/Qwen3-8B-Instruct
+  runtime:
+    name: vllm-nvidia
+    argsOverride:
+      - --max-model-len=8192
+      - --gpu-memory-utilization=0.9
+  resources:
+    accelerators: 1
+    cpu: "8"
+    memory: 32Gi
+  scaling:
+    min: 0
+    max: 3
+    metric: queueDepth
+    target: 10
+    activationTimeout: 5m
+  cache:
+    strategy: NodeLocalPVC
+    size: 60Gi
+    prewarm: true
+  endpoint:
+    openAICompatible: true
+    coldStart:
+      mode: keepalive
+      heartbeatInterval: 10s

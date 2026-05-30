@@ -1,0 +1,54 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: vllm-ascend
+# v0: golden-tested only; validated on real Ascend NPUs in v1.
+spec:
+  family: vllm
+  vendor: ascend
+  priority: 100
+  container:
+    image: quay.io/ascend/vllm-ascend:v0.18.0
+    args:
+      - --model={{ .Model.Path }}
+      - --served-model-name={{ .Service.Name }}
+      - --port=8000
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    # device visibility is set by the Ascend device plugin; Hearth only requests the resource
+    resourceName: huawei.com/Ascend910
+    sharing:
+      supported: false
+    nodeSelector:
+      accelerator: ascend-910
+  health:
+    readiness:
+      httpGet:
+        path: /health
+        port: http
+    liveness:
+      httpGet:
+        path: /health
+        port: http
+      failureThreshold: 6
+    startup:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+      failureThreshold: 180
+  lifecycle:
+    terminationGracePeriodSeconds: 120
+    preStopDrain: true
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:gpu_cache_usage_perc
+    running: vllm:num_requests_running
+    ttft: vllm:time_to_first_token_seconds

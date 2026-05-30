@@ -20,13 +20,15 @@ package registry
 
 import (
 	"github.com/hearth-project/hearth/internal/backend"
+	"github.com/hearth-project/hearth/internal/backend/ascend"
 	"github.com/hearth-project/hearth/internal/backend/nvidia"
 )
 
-// New returns the default registry. v0 implements nvidia; ascend/mlu adapters land
-// in later milestones.
+// New returns the default registry. v0 fully implements nvidia and scaffolds ascend
+// (golden-tested, validated on real NPUs in v1); the mlu adapter lands later.
 func New() *backend.Registry {
 	r := backend.NewRegistry()
 	r.Register(nvidia.New())
+	r.Register(ascend.New())
 	return r
 }

@@ -1,0 +1,60 @@
+/*
+Copyright 2026 The Hearth Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package backend_test
+
+import (
+	"testing"
+
+	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
+	"github.com/hearth-project/hearth/internal/backend"
+)
+
+func scalingService() *servingv1alpha1.LLMService {
+	return &servingv1alpha1.LLMService{
+		ObjectMeta: metav1.ObjectMeta{Name: "qwen3-8b", Namespace: "ai"},
+		Spec: servingv1alpha1.LLMServiceSpec{
+			Scaling: servingv1alpha1.ScalingSpec{Min: 0, Max: 3, Target: 10},
+		},
+	}
+}
+
+func TestScaledObjectMetricsAPITrigger(t *testing.T) {
+	g := NewWithT(t)
+	so := backend.BuildScaledObject(scalingService())
+
+	g.Expect(so.GetAPIVersion()).To(Equal("keda.sh/v1alpha1"))
+	g.Expect(so.GetKind()).To(Equal("ScaledObject"))
+
+	spec := so.Object["spec"].(map[string]any)
+	g.Expect(spec["minReplicaCount"]).To(Equal(int64(0)))
+	g.Expect(spec["maxReplicaCount"]).To(Equal(int64(3)))
+	g.Expect(spec["scaleTargetRef"]).To(HaveKeyWithValue("name", "qwen3-8b"))
+
+	triggers := spec["triggers"].([]any)
+	g.Expect(triggers).To(HaveLen(1))
+	trig := triggers[0].(map[string]any)
+	g.Expect(trig["type"]).To(Equal("metrics-api"))
+
+	md := trig["metadata"].(map[string]any)
+	g.Expect(md["url"]).To(Equal("http://qwen3-8b.ai.svc/hearth/queue"))
+	g.Expect(md["valueLocation"]).To(Equal("pending"))
+	g.Expect(md["targetValue"]).To(Equal("10"))
+	g.Expect(md["activationTargetValue"]).To(Equal("0"))
+}

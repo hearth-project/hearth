@@ -115,6 +115,8 @@ var _ = Describe("LLMService Controller", func() {
 			// the user-facing Service and HA gateway sit in front
 			gwDep := &appsv1.Deployment{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-gateway", Namespace: namespace}, gwDep)).To(Succeed())
+			Expect(gwDep.Spec.Replicas).NotTo(BeNil())
+			Expect(*gwDep.Spec.Replicas).To(Equal(int32(1))) // default: crisp scale-from-zero
 			gwSvc := &corev1.Service{}
 			Expect(k8sClient.Get(ctx, key, gwSvc)).To(Succeed())
 			Expect(gwSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/gateway", svcName))

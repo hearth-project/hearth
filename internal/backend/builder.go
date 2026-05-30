@@ -52,16 +52,6 @@ func podLabels(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRun
 	return l
 }
 
-// DesiredReplicas is the replica count the operator manages directly. Scale-to-zero
-// (min=0) is owned by KEDA in a later milestone; until then a single manual replica
-// keeps the service reachable.
-func DesiredReplicas(svc *servingv1alpha1.LLMService) int32 {
-	if svc.Spec.Scaling.Min > 0 {
-		return svc.Spec.Scaling.Min
-	}
-	return 1
-}
-
 // BuildDeployment assembles the vLLM Deployment for an LLMService, using the vendor
 // adapter for the pod spec and accelerator request.
 func BuildDeployment(a BackendAdapter, svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime, m ResolvedModel) (*appsv1.Deployment, error) {
@@ -81,7 +71,9 @@ func BuildDeployment(a BackendAdapter, svc *servingv1alpha1.LLMService, rt *serv
 	}
 	applyCache(&pod, art)
 
-	replicas := DesiredReplicas(svc)
+	// The operator intentionally does NOT set .spec.replicas: KEDA's HPA owns the
+	// backend replica count (0..N, including scale-to-zero). On first create the API
+	// server defaults it to 1 until KEDA takes over.
 	dep := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -90,7 +82,6 @@ func BuildDeployment(a BackendAdapter, svc *servingv1alpha1.LLMService, rt *serv
 			Labels:    podLabels(svc, rt),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: SelectorLabels(svc)},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: podLabels(svc, rt)},

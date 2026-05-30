@@ -48,6 +48,9 @@ type LLMServiceReconciler struct {
 	Backends *backend.Registry
 	// GatewayImage is the data-plane proxy image the operator deploys per LLMService.
 	GatewayImage string
+	// GatewayReplicas is the per-LLMService gateway replica count (default 1; see
+	// BuildGatewayDeployment for why >1 softens scale-from-zero today).
+	GatewayReplicas int32
 }
 
 // +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices,verbs=get;list;watch;create;update;patch;delete
@@ -57,6 +60,7 @@ type LLMServiceReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile renders the vLLM Deployment and Service for an LLMService from its
 // selected InferenceRuntime, then reflects the result in status.
@@ -93,7 +97,7 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.apply(ctx, &svc, backend.BuildBackendService(&svc, rt)); err != nil {
 		return r.fail(ctx, &svc, "ApplyBackendService", err)
 	}
-	if err := r.apply(ctx, &svc, backend.BuildGatewayDeployment(&svc, r.GatewayImage)); err != nil {
+	if err := r.apply(ctx, &svc, backend.BuildGatewayDeployment(&svc, r.GatewayImage, r.GatewayReplicas)); err != nil {
 		return r.fail(ctx, &svc, "ApplyGateway", err)
 	}
 	if err := r.apply(ctx, &svc, backend.BuildGatewayService(&svc)); err != nil {
@@ -118,6 +122,10 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err := r.ensureCreated(ctx, &svc, job); err != nil {
 			return r.fail(ctx, &svc, "ApplyPrewarmJob", err)
 		}
+	}
+
+	if err := r.applyScaledObject(ctx, &svc); err != nil {
+		return r.fail(ctx, &svc, "ApplyScaledObject", err)
 	}
 
 	var live appsv1.Deployment
@@ -182,6 +190,22 @@ func (r *LLMServiceReconciler) apply(ctx context.Context, owner *servingv1alpha1
 	return r.Apply(ctx, ac, fieldOwner, client.ForceOwnership)
 }
 
+// applyScaledObject server-side applies the KEDA ScaledObject. If KEDA is not installed
+// (the CRD is absent), it logs and continues — the backend then simply runs at its
+// default replica count instead of autoscaling, rather than failing reconcile.
+func (r *LLMServiceReconciler) applyScaledObject(ctx context.Context, svc *servingv1alpha1.LLMService) error {
+	so := backend.BuildScaledObject(svc)
+	if err := controllerutil.SetControllerReference(svc, so, r.Scheme); err != nil {
+		return err
+	}
+	err := r.Apply(ctx, client.ApplyConfigurationFromUnstructured(so), fieldOwner, client.ForceOwnership)
+	if meta.IsNoMatchError(err) {
+		logf.FromContext(ctx).Info("KEDA not installed; skipping ScaledObject (autoscaling disabled)")
+		return nil
+	}
+	return err
+}
+
 // ensureCreated creates an owned object once and ignores AlreadyExists. Used for the
 // cache PVC and prewarm Job, which have immutable fields and are never updated in place.
 func (r *LLMServiceReconciler) ensureCreated(ctx context.Context, owner *servingv1alpha1.LLMService, obj client.Object) error {
@@ -201,6 +225,8 @@ func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1a
 		phase = servingv1alpha1.PhaseReady
 	case dep.Status.Replicas > 0:
 		phase = servingv1alpha1.PhaseLoading
+	case svc.Spec.Scaling.Min == 0:
+		phase = servingv1alpha1.PhaseScaledToZero
 	}
 
 	svc.Status.Phase = phase

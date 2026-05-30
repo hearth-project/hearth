@@ -117,9 +117,8 @@ func TestBuildDeploymentAssembles(t *testing.T) {
 	dep, err := backend.BuildDeployment(nvidia.New(), sampleService(), sampleRuntime(), resolvedModel())
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// min=0 (scale-to-zero, KEDA-owned later) => 1 manual replica for now
-	g.Expect(dep.Spec.Replicas).NotTo(BeNil())
-	g.Expect(*dep.Spec.Replicas).To(Equal(int32(1)))
+	// the operator does not own replicas; KEDA's HPA does (scale-to-zero handoff)
+	g.Expect(dep.Spec.Replicas).To(BeNil())
 	g.Expect(dep.Spec.Selector.MatchLabels).To(HaveKeyWithValue("serving.hearth.dev/llmservice", "qwen3-8b"))
 	g.Expect(dep.Spec.Template.Labels).To(HaveKeyWithValue("serving.hearth.dev/runtime", "vllm-nvidia"))
 

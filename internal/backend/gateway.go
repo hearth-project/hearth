@@ -29,10 +29,13 @@ import (
 )
 
 const (
-	gatewayPort      = 8080
-	gatewayReplicas  = 2 // HA by default; no single point of failure
-	gatewayLabel     = "serving.hearth.dev/gateway"
-	backendSvcSuffix = "-backend"
+	gatewayPort = 8080
+	// defaultGatewayReplicas is 1 for crisp scale-from-zero: KEDA's metrics-api polls a
+	// single gateway replica's pending count, so >1 replica (each counting its own
+	// pending) softens activation until an aggregating scaler lands. Accepts SPOF for v0.
+	defaultGatewayReplicas = 1
+	gatewayLabel           = "serving.hearth.dev/gateway"
+	backendSvcSuffix       = "-backend"
 )
 
 // BackendServiceName is the internal Service selecting the vLLM pods; the gateway
@@ -86,9 +89,12 @@ func BuildGatewayService(svc *servingv1alpha1.LLMService) *corev1.Service {
 	}
 }
 
-// BuildGatewayDeployment renders the HA gateway fronting one LLMService.
-func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string) *appsv1.Deployment {
-	replicas := int32(gatewayReplicas)
+// BuildGatewayDeployment renders the gateway fronting one LLMService. replicas <= 0
+// falls back to defaultGatewayReplicas.
+func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, replicas int32) *appsv1.Deployment {
+	if replicas <= 0 {
+		replicas = defaultGatewayReplicas
+	}
 	backendURL := fmt.Sprintf("http://%s.%s.svc:80", BackendServiceName(svc), svc.Namespace)
 	labels := gatewaySelectorLabels(svc)
 

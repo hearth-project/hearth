@@ -1,0 +1,88 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "hearth.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "hearth.labels" . | nindent 4 }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "hearth.fullname" . }}-manager-role
+  labels: {{- include "hearth.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [persistentvolumeclaims, services]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [apps]
+  resources: [deployments]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [batch]
+  resources: [jobs]
+  verbs: [create, delete, get, list, patch, update, watch]
+# Optional integrations: Hearth degrades gracefully if these CRDs are absent.
+- apiGroups: [keda.sh]
+  resources: [scaledobjects]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [monitoring.coreos.com]
+  resources: [servicemonitors]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [serving.hearth.dev]
+  resources: [inferenceruntimes, llmservices]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [serving.hearth.dev]
+  resources: [inferenceruntimes/finalizers, llmservices/finalizers]
+  verbs: [update]
+- apiGroups: [serving.hearth.dev]
+  resources: [inferenceruntimes/status, llmservices/status]
+  verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "hearth.fullname" . }}-manager-rolebinding
+  labels: {{- include "hearth.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "hearth.fullname" . }}-manager-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "hearth.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- if .Values.operator.leaderElect }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "hearth.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "hearth.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [coordination.k8s.io]
+  resources: [leases]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "hearth.fullname" . }}-leader-election
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "hearth.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "hearth.fullname" . }}-leader-election
+subjects:
+- kind: ServiceAccount
+  name: {{ include "hearth.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

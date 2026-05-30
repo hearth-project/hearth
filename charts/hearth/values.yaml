@@ -1,0 +1,31 @@
+# Default values for the Hearth operator chart.
+
+image:
+  # registry/repo for both images; tag defaults to the chart appVersion.
+  registry: ghcr.io/hearth-project
+  operator: hearth
+  gateway: hearth-gateway
+  tag: ""
+  pullPolicy: IfNotPresent
+
+operator:
+  replicas: 1
+  leaderElect: false
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 10m
+      memory: 128Mi
+
+gateway:
+  # Replicas for each LLMService's data-plane gateway. 1 gives crisp scale-from-zero;
+  # >1 adds HA but softens activation until an aggregating scaler lands.
+  replicas: 1
+
+serviceAccount:
+  create: true
+  name: ""
+
+nameOverride: ""

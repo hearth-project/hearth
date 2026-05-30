@@ -1,0 +1,18 @@
+apiVersion: v2
+name: hearth
+description: Declarative, scale-to-zero serving for domestic open-source LLMs on Kubernetes — vendor-neutral across NVIDIA, Ascend, and more.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.29.0-0"
+keywords:
+  - llm
+  - vllm
+  - operator
+  - scale-to-zero
+  - ascend
+home: https://github.com/hearth-project/hearth
+sources:
+  - https://github.com/hearth-project/hearth
+maintainers:
+  - name: The Hearth Authors

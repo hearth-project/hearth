@@ -74,6 +74,28 @@ resource, probes, metrics). Adapter **code** is thin because the differences are
 
 Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).
 
+## Install
+
+Hearth needs **KEDA** for scale-to-zero (and optionally the **Prometheus Operator** for the
+ServiceMonitor + dashboard — Hearth degrades gracefully without it).
+
+```bash
+# KEDA (required for autoscaling / scale-to-zero)
+helm repo add kedacore https://kedacore.github.io/charts
+helm install keda kedacore/keda -n keda --create-namespace
+
+# Hearth operator (CRDs + RBAC + controller)
+helm install hearth ./charts/hearth -n hearth-system --create-namespace
+```
+
+Then register a backend and deploy a model:
+
+```bash
+kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
+kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml
+kubectl get llmservice -w
+```
+
 ## Quickstart (kind, no GPU required to try the control plane)
 
 ```bash

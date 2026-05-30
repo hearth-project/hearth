@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= ghcr.io/hearth-project/hearth:latest
 # YEAR defines the year value used for substituting the YEAR placeholder in the boilerplate header.
 YEAR ?= $(shell date +%Y)
 
@@ -127,7 +127,7 @@ docker-build: ## Build docker image with the manager.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${IMG}
 
-GATEWAY_IMG ?= hearth-gateway:latest
+GATEWAY_IMG ?= ghcr.io/hearth-project/hearth-gateway:latest
 
 .PHONY: docker-build-gateway
 docker-build-gateway: ## Build the data-plane gateway image.
@@ -136,6 +136,10 @@ docker-build-gateway: ## Build the data-plane gateway image.
 .PHONY: docker-push-gateway
 docker-push-gateway: ## Push the data-plane gateway image.
 	$(CONTAINER_TOOL) push ${GATEWAY_IMG}
+
+.PHONY: helm-crds
+helm-crds: manifests ## Sync generated CRDs into the Helm chart's crds/ directory.
+	cp config/crd/bases/*.yaml charts/hearth/crds/
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

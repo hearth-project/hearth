@@ -46,7 +46,12 @@ var _ = Describe("LLMService Controller", func() {
 		runtimeKey := types.NamespacedName{Name: runtimeName}
 
 		reconciler := func() *LLMServiceReconciler {
-			return &LLMServiceReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Backends: registry.New()}
+			return &LLMServiceReconciler{
+				Client:       k8sClient,
+				Scheme:       k8sClient.Scheme(),
+				Backends:     registry.New(),
+				GatewayImage: "ghcr.io/hearth-project/hearth-gateway:test",
+			}
 		}
 
 		BeforeEach(func() {
@@ -102,9 +107,17 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: "VLLM_USE_MODELSCOPE", Value: "true"}))
 			Expect(dep.OwnerReferences).NotTo(BeEmpty())
 
-			httpSvc := &corev1.Service{}
-			Expect(k8sClient.Get(ctx, key, httpSvc)).To(Succeed())
-			Expect(httpSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/llmservice", svcName))
+			// the internal backend Service selects the vLLM pods
+			backendSvc := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-backend", Namespace: namespace}, backendSvc)).To(Succeed())
+			Expect(backendSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/llmservice", svcName))
+
+			// the user-facing Service and HA gateway sit in front
+			gwDep := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-gateway", Namespace: namespace}, gwDep)).To(Succeed())
+			gwSvc := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, key, gwSvc)).To(Succeed())
+			Expect(gwSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/gateway", svcName))
 
 			// cache defaults to NodeLocalPVC, so a cache PVC is provisioned
 			pvc := &corev1.PersistentVolumeClaim{}

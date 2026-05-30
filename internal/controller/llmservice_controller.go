@@ -46,6 +46,8 @@ type LLMServiceReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Backends *backend.Registry
+	// GatewayImage is the data-plane proxy image the operator deploys per LLMService.
+	GatewayImage string
 }
 
 // +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices,verbs=get;list;watch;create;update;patch;delete
@@ -88,8 +90,14 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.apply(ctx, &svc, dep); err != nil {
 		return r.fail(ctx, &svc, "ApplyDeployment", err)
 	}
-	if err := r.apply(ctx, &svc, backend.BuildService(&svc, rt)); err != nil {
-		return r.fail(ctx, &svc, "ApplyService", err)
+	if err := r.apply(ctx, &svc, backend.BuildBackendService(&svc, rt)); err != nil {
+		return r.fail(ctx, &svc, "ApplyBackendService", err)
+	}
+	if err := r.apply(ctx, &svc, backend.BuildGatewayDeployment(&svc, r.GatewayImage)); err != nil {
+		return r.fail(ctx, &svc, "ApplyGateway", err)
+	}
+	if err := r.apply(ctx, &svc, backend.BuildGatewayService(&svc)); err != nil {
+		return r.fail(ctx, &svc, "ApplyGatewayService", err)
 	}
 
 	pvc, err := backend.BuildCachePVC(&svc)

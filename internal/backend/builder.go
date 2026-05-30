@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 )
@@ -124,26 +123,5 @@ func applyAccelerator(pod *corev1.PodSpec, accel AcceleratorRequest) {
 			pod.Containers[i].Resources.Limits = corev1.ResourceList{}
 		}
 		maps.Copy(pod.Containers[i].Resources.Limits, accel.Resources)
-	}
-}
-
-// BuildService builds the ClusterIP Service fronting an LLMService's pods.
-func BuildService(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) *corev1.Service {
-	return &corev1.Service{
-		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      svc.Name,
-			Namespace: svc.Namespace,
-			Labels:    SelectorLabels(svc),
-		},
-		Spec: corev1.ServiceSpec{
-			Selector: SelectorLabels(svc),
-			Ports: []corev1.ServicePort{{
-				Name:       "http",
-				Port:       80,
-				TargetPort: intstr.FromString(rt.Spec.Container.Port.Name),
-				Protocol:   corev1.ProtocolTCP,
-			}},
-		},
 	}
 }

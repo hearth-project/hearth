@@ -27,6 +27,7 @@ spec:
   cache:
     strategy: NodeLocalPVC
     size: 60Gi
+    storageClassName: alicloud-disk-essd
     prewarm: true
   endpoint:
     openAICompatible: true

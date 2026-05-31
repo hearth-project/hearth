@@ -18,6 +18,7 @@ package backend_test
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -154,6 +155,32 @@ func TestPrewarmJob(t *testing.T) {
 	job, err = backend.BuildPrewarmJob(serviceWithCache("None", true), runtimeFixture(), model())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(job).To(BeNil())
+}
+
+func TestGracefulDrainWiresPreStopAndGrace(t *testing.T) {
+	g := NewWithT(t)
+	svc := serviceWithCache("None", false)
+	svc.Spec.Scaling.DrainTimeout = metav1.Duration{Duration: 90 * time.Second}
+	rt := runtimeFixture()
+	rt.Spec.Lifecycle.PreStopDrain = true
+
+	pod, err := backend.RenderVLLMPodSpec(svc, rt, model())
+	g.Expect(err).NotTo(HaveOccurred())
+	c := servingContainer(pod)
+	g.Expect(c.Lifecycle).NotTo(BeNil())
+	g.Expect(c.Lifecycle.PreStop.Exec.Command).To(ContainElement(ContainSubstring("sleep 90")))
+	g.Expect(pod.TerminationGracePeriodSeconds).NotTo(BeNil())
+	g.Expect(*pod.TerminationGracePeriodSeconds).To(BeNumerically(">=", int64(90)))
+}
+
+func TestNoDrainWhenPreStopDisabled(t *testing.T) {
+	g := NewWithT(t)
+	svc := serviceWithCache("None", false)
+	svc.Spec.Scaling.DrainTimeout = metav1.Duration{Duration: 90 * time.Second}
+
+	pod, err := backend.RenderVLLMPodSpec(svc, runtimeFixture(), model())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(servingContainer(pod).Lifecycle).To(BeNil())
 }
 
 func TestDefaultProbesWhenRuntimeOmitsThem(t *testing.T) {

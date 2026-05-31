@@ -88,6 +88,9 @@ func planCache(svc *servingv1alpha1.LLMService) (cacheArtifacts, error) {
 				Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: size}},
 			},
 		}
+		if sc := svc.Spec.Cache.StorageClassName; sc != nil && *sc != "" {
+			pvc.Spec.StorageClassName = sc
+		}
 		return cacheArtifacts{
 			volume: &corev1.Volume{Name: cacheVolumeName, VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: CachePVCName(svc)},

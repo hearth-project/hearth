@@ -106,6 +106,12 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 	if at := svc.Spec.Scaling.ActivationTimeout.Duration; at > 0 {
 		env = append(env, corev1.EnvVar{Name: gateway.EnvActivationTimeout, Value: at.String()})
 	}
+	if cs := svc.Spec.Endpoint.ColdStart; cs.Mode != "" {
+		env = append(env, corev1.EnvVar{Name: gateway.EnvColdStartMode, Value: cs.Mode})
+		if hb := cs.HeartbeatInterval.Duration; hb > 0 {
+			env = append(env, corev1.EnvVar{Name: gateway.EnvHeartbeatInterval, Value: hb.String()})
+		}
+	}
 
 	probe := &corev1.Probe{ProbeHandler: corev1.ProbeHandler{
 		HTTPGet: &corev1.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt(gatewayPort)},

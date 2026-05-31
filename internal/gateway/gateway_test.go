@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -171,6 +172,68 @@ func TestExposesPrometheusMetrics(t *testing.T) {
 	body, _ := io.ReadAll(m.Body)
 	g.Expect(string(body)).To(ContainSubstring("hearth_gateway_requests_total"))
 	g.Expect(string(body)).To(ContainSubstring("hearth_gateway_activation_wait_seconds"))
+}
+
+func TestKeepaliveStreamsHeartbeatsThenResponse(t *testing.T) {
+	g := NewWithT(t)
+	be := &stubBackend{} // starts not ready
+	srv := httptest.NewServer(be.handler())
+	defer srv.Close()
+
+	go func() {
+		time.Sleep(60 * time.Millisecond)
+		be.ready.Store(true)
+	}()
+
+	gw, err := gateway.New(gateway.Config{
+		BackendURL:        srv.URL,
+		MaxQueue:          10,
+		ActivationTimeout: 2 * time.Second,
+		RetryInterval:     5 * time.Millisecond,
+		ColdStartMode:     gateway.ColdStartKeepalive,
+		HeartbeatInterval: 10 * time.Millisecond,
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	fe := httptest.NewServer(gw.Handler())
+	defer fe.Close()
+
+	resp, err := http.Post(fe.URL+"/v1/chat/completions", "application/json",
+		strings.NewReader(`{"stream":true}`))
+	g.Expect(err).NotTo(HaveOccurred())
+	defer func() { _ = resp.Body.Close() }()
+	g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	g.Expect(resp.Header.Get("Content-Type")).To(Equal("text/event-stream"))
+
+	body, _ := io.ReadAll(resp.Body)
+	g.Expect(string(body)).To(ContainSubstring(": heartbeat"))
+	g.Expect(string(body)).To(ContainSubstring("ok"))
+}
+
+func TestRejectModeReturns503AndKeepsDemand(t *testing.T) {
+	g := NewWithT(t)
+	be := &stubBackend{} // never ready
+	srv := httptest.NewServer(be.handler())
+	defer srv.Close()
+
+	gw, err := gateway.New(gateway.Config{
+		BackendURL:        srv.URL,
+		MaxQueue:          10,
+		ActivationTimeout: time.Second,
+		RetryInterval:     5 * time.Millisecond,
+		ColdStartMode:     gateway.ColdStartReject,
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	fe := httptest.NewServer(gw.Handler())
+	defer fe.Close()
+
+	resp, err := http.Post(fe.URL+"/v1/x", "application/json", nil)
+	g.Expect(err).NotTo(HaveOccurred())
+	defer func() { _ = resp.Body.Close() }()
+	g.Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
+	g.Expect(resp.Header.Get("Retry-After")).NotTo(BeEmpty())
+
+	// Even though the request returned immediately, demand lingers so the scaler activates.
+	g.Expect(queuePending(fe.URL)).To(Equal(int64(1)))
 }
 
 func queuePending(base string) int64 {

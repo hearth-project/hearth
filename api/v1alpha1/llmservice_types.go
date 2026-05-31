@@ -155,6 +155,12 @@ type CacheSpec struct {
 	// +optional
 	Size *resource.Quantity `json:"size,omitempty"`
 
+	// storageClassName pins the cache PVC to a StorageClass; empty uses the cluster
+	// default. Set this on clusters without a default StorageClass (common on managed
+	// or domestic clusters) or to target a specific disk type.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
 	// prewarm hydrates weights into the cache before first traffic.
 	// +optional
 	Prewarm bool `json:"prewarm,omitempty"`

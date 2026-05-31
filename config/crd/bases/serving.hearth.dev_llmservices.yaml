@@ -69,6 +69,12 @@ spec:
                     - type: string
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
+                  storageClassName:
+                    description: |-
+                      storageClassName pins the cache PVC to a StorageClass; empty uses the cluster
+                      default. Set this on clusters without a default StorageClass (common on managed
+                      or domestic clusters) or to target a specific disk type.
+                    type: string
                   strategy:
                     default: NodeLocalPVC
                     enum:

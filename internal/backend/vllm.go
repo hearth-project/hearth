@@ -84,7 +84,36 @@ func RenderVLLMPodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infe
 	if gp := rt.Spec.Lifecycle.TerminationGracePeriodSeconds; gp != nil {
 		pod.TerminationGracePeriodSeconds = gp
 	}
+	applyDrain(&pod, svc, rt)
 	return pod, nil
+}
+
+// applyDrain wires graceful scale-down: a preStop sleep keeps the pod alive (and removed
+// from Service endpoints, so no new traffic) while in-flight streams finish before SIGTERM.
+// terminationGracePeriodSeconds is widened to cover the drain so the kubelet doesn't cut it short.
+func applyDrain(pod *corev1.PodSpec, svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) {
+	if !rt.Spec.Lifecycle.PreStopDrain {
+		return
+	}
+	drain := svc.Spec.Scaling.DrainTimeout.Duration
+	if drain <= 0 {
+		return
+	}
+	secs := int64(drain.Seconds())
+	for i := range pod.Containers {
+		if pod.Containers[i].Name != ServingContainerName {
+			continue
+		}
+		pod.Containers[i].Lifecycle = &corev1.Lifecycle{
+			PreStop: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{Command: []string{"/bin/sh", "-c", fmt.Sprintf("sleep %d", secs)}},
+			},
+		}
+	}
+	grace := secs + 10
+	if pod.TerminationGracePeriodSeconds == nil || *pod.TerminationGracePeriodSeconds < grace {
+		pod.TerminationGracePeriodSeconds = &grace
+	}
 }
 
 // WholeDeviceAccelerator requests N whole accelerator devices named by the runtime,

@@ -7,10 +7,12 @@ Hearth is a Kubernetes operator that turns "run Qwen / DeepSeek / GLM on my priv
 single `LLMService` manifest: declarative deploy, queue-driven autoscaling, and **scale-to-zero** —
 with NVIDIA-vLLM / vLLM-Ascend / vLLM-MLU as **pluggable backends** behind one API.
 
-> **Status — v0, early.** The NVIDIA backend is implemented and tested; the **Ascend** backend is
-> scaffolded and golden-tested (renders correct manifests) but **not yet validated on real NPUs** —
-> that's the v1 milestone (pending hardware). Scale-to-zero (gateway + KEDA) is in progress. Not
-> production-ready. ⭐ and follow along.
+> **Status — pre-release `v0.1.0` (alpha).** The NVIDIA backend and the full scale-to-zero path
+> (gateway + KEDA) are **implemented and verified end-to-end on real NVIDIA GPUs** — cold-start
+> keepalive, graceful drain, model caching/prewarm, 1→N autoscaling, and observability. The
+> **Ascend** backend is scaffolded and golden-tested (renders correct manifests) but **not yet
+> validated on real NPUs** — the v1 milestone (pending hardware). Still `v1alpha1` and **not
+> production-ready** (no auth, no multi-tenancy) — see the **[roadmap](ROADMAP.md)**. ⭐ and follow along.
 
 ## Why Hearth
 
@@ -76,6 +78,10 @@ Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](int
 
 ## Install
 
+> **Pre-release (`v0.1.0`):** prebuilt images aren't published yet, so build and push your own and
+> pass the tag to the chart. A tagged release will publish `ghcr.io/hearth-project/hearth` and
+> `hearth-gateway` and make the chart install work without the `--set` overrides.
+
 Hearth needs **KEDA** for scale-to-zero (and optionally the **Prometheus Operator** for the
 ServiceMonitor + dashboard — Hearth degrades gracefully without it).
 
@@ -84,8 +90,13 @@ ServiceMonitor + dashboard — Hearth degrades gracefully without it).
 helm repo add kedacore https://kedacore.github.io/charts
 helm install keda kedacore/keda -n keda --create-namespace
 
+# Build + push the operator and gateway images (until a tagged release publishes them)
+make docker-build         docker-push         IMG=<your-registry>/hearth:v0.1.0
+make docker-build-gateway docker-push-gateway GATEWAY_IMG=<your-registry>/hearth-gateway:v0.1.0
+
 # Hearth operator (CRDs + RBAC + controller)
-helm install hearth ./charts/hearth -n hearth-system --create-namespace
+helm install hearth ./charts/hearth -n hearth-system --create-namespace \
+  --set image.registry=<your-registry> --set image.tag=v0.1.0
 ```
 
 Then register a backend and deploy a model:
@@ -114,8 +125,10 @@ kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml -n ai
 kubectl get llmservice,deploy,svc -n ai
 ```
 
-To actually serve tokens you need an NVIDIA GPU node with the device plugin; see `docs/` (coming
-soon) for the spot-GPU walkthrough.
+This exercises the control plane: the operator reconciles an `LLMService` into its child objects.
+The gateway and backend pods won't start until you point the operator at a built gateway image
+(`go run ./cmd/main.go --gateway-image=<your-registry>/hearth-gateway:v0.1.0`) and provide a GPU node
+with the device plugin. See `docs/` (coming soon) for the spot-GPU walkthrough.
 
 ## Architecture (short)
 
@@ -126,9 +139,17 @@ and the scale-to-zero data flow live in [`docs/`](docs) and the project proposal
 
 ## Roadmap
 
-- **v0** — multi-backend abstraction on NVIDIA; model caching; gateway + KEDA scale-to-zero; Helm + dashboard.
+See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what v0 is (and isn't) good for.
+
+- **v0 — `v0.1.0` pre-release (now)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
+  real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
+  drain, 1→N autoscaling, Helm + dashboard.
 - **v1** — Ascend running on real NPUs; HAMi/Volcano integration; curated domestic-model catalog.
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
+
+**Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today for
+**internal/dev, latency-tolerant, cost-sensitive** serving (scale-to-zero packs many idle models onto
+few GPUs); see the roadmap's production-readiness section before exposing it to real users.
 
 ## Contributing & License
 

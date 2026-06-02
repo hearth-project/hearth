@@ -1,0 +1,37 @@
+name: auto-label
+
+on:
+  issues:
+    types: [opened, edited]
+  # pull_request_target runs in the base-repo context so it can label fork PRs.
+  # Safe here: we only read the title and add a label — no checkout, no PR code runs.
+  pull_request_target:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const item = context.payload.pull_request || context.payload.issue;
+            const title = item.title || "";
+            // Conventional Commit type (optional scope, optional "!") -> label
+            const rules = [
+              { re: /^fix(\(.+\))?!?:/i,  label: "bug" },
+              { re: /^feat(\(.+\))?!?:/i, label: "enhancement" },
+            ];
+            const labels = rules.filter(r => r.re.test(title)).map(r => r.label);
+            if (labels.length) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: item.number,
+                labels,
+              });
+            }

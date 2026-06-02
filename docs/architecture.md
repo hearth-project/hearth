@@ -1,0 +1,79 @@
+# Architecture
+
+Hearth is a Kubernetes operator that turns a single `LLMService` manifest into a declarative,
+queue-driven, **scale-to-zero** model server — vendor-neutral across NVIDIA, Ascend, and more.
+
+## Boundary (what Hearth is, and isn't)
+
+Hearth owns the **Kubernetes orchestration / lifecycle layer**: rendering workloads, model loading,
+health, scheduling adaptation, scale-to-zero, and metrics. It deliberately does **not** re-implement
+the inference engine (that's **vLLM** + vendor plugins) or write chip kernels / device plugins /
+schedulers (that's the vendors, **HAMi**, **Volcano**). A new accelerator is a thin adapter, not a
+rewrite.
+
+## CRDs
+
+API group `serving.hearth.dev/v1alpha1`.
+
+- **`LLMService`** (namespaced, user-facing) — *what* to serve and *how* to scale: the model source,
+  a runtime selection (pin a backend or auto-pick by vendor), abstract resources, scaling intent
+  (incl. `min: 0` for scale-to-zero), cache strategy, and cold-start behavior.
+- **`InferenceRuntime`** (cluster-scoped, reusable) — a *pluggable backend driver*: container image +
+  templated args, the device-plugin resource name (e.g. `nvidia.com/gpu`, `huawei.com/Ascend910`),
+  scheduling (nodeSelector/tolerations/scheduler), model-load-aware probes, lifecycle (drain), and
+  where the LLM-aware metrics live. This is the multi-backend differentiator.
+
+## Components
+
+- **Operator / controllers** (`internal/controller`) — reconcile an `LLMService` (+ its
+  `InferenceRuntime`) into the child objects below, via server-side apply, gracefully skipping
+  optional CRDs (KEDA / Prometheus) when absent.
+- **Backend abstraction** (`internal/backend`) — a `BackendAdapter` interface + registry. Shared code
+  renders the vLLM pod, accelerator request, and metrics source; thin `nvidia` / `ascend` adapters
+  add vendor specifics. Adapters are golden-tested, so they're provable without hardware.
+- **Gateway** (`internal/gateway`) — the data plane: an OpenAI-compatible reverse proxy in front of
+  each `LLMService`. It buffers requests during cold start, applies bounded-queue backpressure,
+  emits SSE keepalive heartbeats (or fast-rejects), drains in-flight streams on scale-down, and
+  exposes its pending-request count as the demand signal.
+
+## Reconcile output
+
+For one `LLMService`, the operator renders: a vLLM **Deployment** (it does *not* set `replicas` —
+KEDA owns `0..N`), a backend **Service**, a **gateway** Deployment + Service, a model **cache**
+(PVC/HostPath) + optional **prewarm Job**, a KEDA **ScaledObject**, and a **ServiceMonitor**.
+
+## Scale-to-zero data flow
+
+```
+client ──▶ gateway ──▶ backend Service ──▶ vLLM pod(s)
+             │  ▲                              ▲
+   /hearth/queue (pending)                     │ load weights from cache
+             │  └── KEDA metrics-api polls ────┘
+             ▼
+        KEDA ScaledObject ──▶ scales the Deployment 0..N
+```
+
+1. **Idle** — KEDA holds the backend Deployment at **0**.
+2. **Cold request** — the gateway admits the request (bounded queue → `429` if full), raises its
+   `pending` count, and holds the connection. In `keepalive` mode it streams SSE heartbeats so the
+   client/ingress don't time out; in `reject` mode it returns `503 + Retry-After` and the client retries.
+3. **Activation** — KEDA's `metrics-api` trigger polls the gateway's `/hearth/queue`; `pending > 0`
+   drives the Deployment **0 → 1**. The pod loads weights from the local cache (prewarmed) and only
+   becomes **Ready** once the model is loaded (load-gated readiness probes).
+4. **Serve** — the gateway forwards the buffered request and streams tokens back.
+5. **Scale up** — sustained queue depth above the per-replica target scales **1 → N** (one whole
+   device per replica).
+6. **Scale down** — when demand drops, KEDA scales back toward **0**; a `preStop` drain lets
+   in-flight streams finish before the pod is terminated.
+
+## Observability
+
+vLLM and the gateway both expose Prometheus `/metrics`; a `ServiceMonitor` selects both, and a
+Grafana dashboard surfaces queue depth, replicas, cold-starts, and request outcomes.
+
+## Caching
+
+Cold-start cost is dominated by fetching + loading weights, so caching is what makes scale-to-zero
+usable. v0 supports `HostPath` and `NodeLocalPVC` (with a pinnable `storageClassName`), plus a
+prewarm Job that hydrates weights before first traffic. Node-local caches are per-node today;
+`SharedPVC` (RWX) for multi-node is on the roadmap.

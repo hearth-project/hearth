@@ -49,3 +49,8 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# Test / coverage artifacts
+cover.out
+*.out
+coverage.*

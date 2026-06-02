@@ -134,8 +134,9 @@ with the device plugin. See `docs/` (coming soon) for the spot-GPU walkthrough.
 
 `LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
 renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` whose external
-scaler is a small Hearth gateway that buffers requests during cold start. Full design, CRD reference,
-and the scale-to-zero data flow live in [`docs/`](docs) and the project proposal.
+scaler is a small Hearth gateway that buffers requests during cold start. A full design and CRD
+reference are being written up in `docs/` (coming soon); until then, the
+[`internal/`](internal) packages and [`ROADMAP.md`](ROADMAP.md) are the best reference.
 
 ## Roadmap
 

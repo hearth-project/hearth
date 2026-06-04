@@ -2,6 +2,10 @@
 IMG ?= ghcr.io/hearth-project/hearth:latest
 # YEAR defines the year value used for substituting the YEAR placeholder in the boilerplate header.
 YEAR ?= $(shell date +%Y)
+# VERSION is injected into manager and gateway binaries. Tagged builds use the
+# nearest git tag, while local builds fall back to dev outside a git checkout.
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
+LDFLAGS ?= -X main.version=$(VERSION)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -109,8 +113,9 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+build: manifests generate fmt vet ## Build manager and gateway binaries.
+	go build -ldflags "$(LDFLAGS)" -o bin/manager cmd/main.go
+	go build -ldflags "$(LDFLAGS)" -o bin/gateway ./cmd/gateway
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -121,7 +126,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -131,7 +136,7 @@ GATEWAY_IMG ?= ghcr.io/hearth-project/hearth-gateway:latest
 
 .PHONY: docker-build-gateway
 docker-build-gateway: ## Build the data-plane gateway image.
-	$(CONTAINER_TOOL) build -f Dockerfile.gateway -t ${GATEWAY_IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -f Dockerfile.gateway -t ${GATEWAY_IMG} .
 
 .PHONY: docker-push-gateway
 docker-push-gateway: ## Push the data-plane gateway image.
@@ -154,7 +159,7 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name hearth-builder
 	$(CONTAINER_TOOL) buildx use hearth-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --build-arg VERSION=$(VERSION) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm hearth-builder
 	rm Dockerfile.cross
 

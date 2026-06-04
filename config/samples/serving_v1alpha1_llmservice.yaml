@@ -27,7 +27,8 @@ spec:
   cache:
     strategy: NodeLocalPVC
     size: 60Gi
-    storageClassName: alicloud-disk-essd
+    # Optional: set this for your cluster if you do not want to use the default StorageClass.
+    # storageClassName: <your-rwo-storage-class> # e.g. alicloud-disk-essd
     prewarm: true
   endpoint:
     openAICompatible: true

@@ -77,3 +77,5 @@ Cold-start cost is dominated by fetching + loading weights, so caching is what m
 usable. v0 supports `HostPath` and `NodeLocalPVC` (with a pinnable `storageClassName`), plus a
 prewarm Job that hydrates weights before first traffic. Node-local caches are per-node today;
 `SharedPVC` (RWX) for multi-node is on the roadmap.
+For clusters without a dynamic StorageClass, see the HostPath sample in
+[`config/samples/serving_v1alpha1_llmservice_hostpath.yaml`](../config/samples/serving_v1alpha1_llmservice_hostpath.yaml).

@@ -3,4 +3,5 @@ resources:
 - serving_v1alpha1_inferenceruntime.yaml
 - serving_v1alpha1_inferenceruntime_ascend.yaml
 - serving_v1alpha1_llmservice.yaml
+- serving_v1alpha1_llmservice_hostpath.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

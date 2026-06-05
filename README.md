@@ -11,7 +11,7 @@ vendor-neutral across NVIDIA, Ascend, and more.**
 [![CI](https://github.com/hearth-project/hearth/actions/workflows/test.yml/badge.svg)](https://github.com/hearth-project/hearth/actions/workflows/test.yml)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-[**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
+[**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Observability**](docs/observability.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -149,6 +149,9 @@ scaler is a small Hearth gateway that buffers requests during cold start.
 
 📖 See [`docs/architecture.md`](docs/architecture.md) for the components, CRDs, and the full
 scale-to-zero data flow.
+
+See [`docs/observability.md`](docs/observability.md) for the Grafana dashboard import steps and
+gateway metric reference.
 
 ## Roadmap
 

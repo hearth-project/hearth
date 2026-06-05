@@ -135,6 +135,17 @@ make docker-build-gateway docker-push-gateway GATEWAY_IMG=<your-registry>/hearth
 helm install hearth ./charts/hearth -n hearth-system --create-namespace \
   --set image.registry=<your-registry> --set image.tag=v0.1.0
 
+# ⚠️ Helm v4 SSA CRD ownership conflict (if upgrading from kubectl-apply install)
+# Helm v4 applies CRDs via Server-Side Apply (SSA), which takes field-manager ownership.
+# If you previously installed Hearth CRDs via `kubectl apply` (e.g., via `make install`),
+# the Helm upgrade will fail with an ownership conflict error.
+# Symptom: "cannot patch <resource> because the object has been modified by
+# field manager '<helm-field-manager>' trying to change fields owned by ..."
+# Fix: Delete the existing CRDs first, then run helm install/upgrade:
+#   kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev
+#   helm install hearth ./charts/hearth ...
+# Or use `kubectl apply --server-side` for CRDs so both tools share the same field manager.
+
 # register a backend and deploy a model
 kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
 kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml

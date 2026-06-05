@@ -1,6 +1,9 @@
-Hearth {{ .Chart.AppVersion }} is installed in namespace "{{ .Release.Namespace }}".
+Hearth release "{{ .Release.Name }}" ({{ .Chart.AppVersion }}) is installed in namespace "{{ .Release.Namespace }}".
 
-The operator is running. It deploys a data-plane gateway per LLMService using:
+Verify the operator deployment:
+  kubectl get deploy -n {{ .Release.Namespace }} {{ include "hearth.fullname" . }}-controller-manager
+
+The operator deploys a data-plane gateway per LLMService using:
   {{ include "hearth.gatewayImage" . }}
 
 Prerequisites for full functionality (Hearth degrades gracefully without them):
@@ -13,9 +16,9 @@ Try it:
   1. Register a backend:
        kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/main/config/samples/serving_v1alpha1_inferenceruntime.yaml
   2. Deploy a model:
-       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/main/config/samples/serving_v1alpha1_llmservice.yaml
+       kubectl apply -n {{ .Release.Namespace }} -f https://raw.githubusercontent.com/hearth-project/hearth/main/config/samples/serving_v1alpha1_llmservice.yaml
   3. Watch it:
-       kubectl get llmservice -w
+       kubectl get llmservice -n {{ .Release.Namespace }} -w
 
 Note: serving real tokens requires a node with a supported accelerator
 (e.g. an NVIDIA GPU + device plugin). Without one, the backend stays Pending.

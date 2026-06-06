@@ -145,8 +145,17 @@ kubectl get llmservice -w
 ## Architecture
 
 `LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
-renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` whose external
-scaler is a small Hearth gateway that buffers requests during cold start.
+renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` that scales on the
+pending-request count of a small Hearth gateway, which buffers requests during cold start.
+
+```mermaid
+flowchart LR
+  client(["client"]) -->|OpenAI API| gw["Hearth Gateway"]
+  gw -->|forward when Ready| pods["vLLM pods (0..N)"]
+  keda["KEDA"] -->|"poll /hearth/queue"| gw
+  keda -->|"scale 0..N"| pods
+  pods -.->|load weights| cache[("cache")]
+```
 
 📖 See [`docs/architecture.md`](docs/architecture.md) for the components, CRDs, and the full
 scale-to-zero data flow.

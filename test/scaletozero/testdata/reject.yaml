@@ -1,0 +1,54 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  name: vllm-stub-unsched
+spec:
+  family: vllm
+  vendor: nvidia
+  priority: 100
+  container:
+    image: hearth.dev/vllm-stub:e2e
+    args: ["--model={{ .Model.Path }}"]
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    # A resource the node does not advertise → the backend pod never schedules,
+    # so the gateway stays cold and (in reject mode) fast-503s.
+    resourceName: hearth.dev/missing-gpu
+    sharing:
+      supported: false
+  health:
+    readiness:
+      httpGet: { path: /health, port: http }
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:gpu_cache_usage_perc
+---
+apiVersion: serving.hearth.dev/v1alpha1
+kind: LLMService
+metadata:
+  name: stub-503
+  namespace: hearth-e2e
+spec:
+  model:
+    source:
+      uri: hf://hearth/stub-model
+  runtime:
+    name: vllm-stub-unsched
+  resources:
+    accelerators: 1
+    cpu: "100m"
+    memory: 128Mi
+  scaling:
+    min: 0
+    max: 1
+    metric: queueDepth
+    target: 1
+    activationTimeout: 5s
+  endpoint:
+    openAICompatible: true
+    coldStart:
+      mode: reject

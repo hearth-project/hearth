@@ -78,7 +78,23 @@ curl -s 'localhost:8000/v1/completions?tokens=2' -d '{"stream":true}'  # 2-token
 
 ## Full scale-to-zero loop on kind
 
-Driving the end-to-end `0→1→N→0` loop (idle → cold request wakes the backend → autoscale → back to
-zero) with the stub, KEDA, and a fake node resource — no GPU — is tracked in
-[#18](https://github.com/hearth-project/hearth/issues/18). Until it lands, the stub plus the table
-above is enough to develop and test the gateway, scaler, and controller changes locally.
+The end-to-end `0→1→N→0` loop (idle → cold request wakes the backend → autoscale → drain back to
+zero, plus reject-mode 503) runs on kind with **no GPU**, in `test/scaletozero/`. It backs each
+`LLMService` with the stub, advertises a fake accelerator resource on the node (via the node-status
+API, so no device plugin), and runs the operator out-of-cluster.
+
+**Prerequisites you provide:** a running Kind cluster (current kube-context) with **KEDA** installed:
+
+```bash
+helm install keda kedacore/keda -n keda --create-namespace
+```
+
+**Run it** (builds + loads the stub and gateway images, then runs the suite):
+
+```bash
+make test-scale-e2e CONTAINER_TOOL=podman          # or omit CONTAINER_TOOL to use docker
+```
+
+For Podman, also export `KIND_EXPERIMENTAL_PROVIDER=podman` so `kind load` targets the right
+cluster. The suite installs Hearth's own CRDs but expects KEDA to be present (it fails fast with
+instructions otherwise). CI runs the same loop on every PR via `.github/workflows/test-scale-e2e.yml`.

@@ -1,0 +1,44 @@
+name: Scale-to-Zero E2E
+
+on:
+  push:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  test-scale-e2e:
+    permissions:
+      contents: read
+    name: No-GPU scale-to-zero loop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Create kind cluster
+        run: kind create cluster --name kind --wait 120s
+
+      - name: Install KEDA
+        run: |
+          helm repo add kedacore https://kedacore.github.io/charts
+          helm repo update kedacore
+          helm install keda kedacore/keda -n keda --create-namespace --wait --timeout 5m
+
+      - name: Run the scale-to-zero e2e
+        run: |
+          go mod tidy
+          make test-scale-e2e

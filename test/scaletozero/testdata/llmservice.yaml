@@ -1,0 +1,30 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: LLMService
+metadata:
+  name: stub-svc
+  namespace: hearth-e2e
+spec:
+  model:
+    source:
+      uri: hf://hearth/stub-model
+  runtime:
+    name: vllm-stub
+  resources:
+    accelerators: 1
+    cpu: "100m"
+    memory: 128Mi
+  scaling:
+    min: 0
+    max: 2
+    metric: queueDepth
+    target: 1
+    activationTimeout: 2m
+    scaleDownStabilization: 15s
+    drainTimeout: 20s
+  cache:
+    strategy: None
+  endpoint:
+    openAICompatible: true
+    coldStart:
+      mode: keepalive
+      heartbeatInterval: 2s

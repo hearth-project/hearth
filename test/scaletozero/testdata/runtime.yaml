@@ -1,0 +1,49 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  name: vllm-stub
+spec:
+  family: vllm
+  vendor: nvidia
+  priority: 100
+  container:
+    # Built by `make docker-build-stub` and loaded into kind; a CPU fake of vLLM.
+    image: hearth.dev/vllm-stub:e2e
+    args:
+      - --model={{ .Model.Path }}
+      - --served-model-name={{ .Service.Name }}
+    env:
+      - name: STUB_STARTUP_DELAY
+        value: "5s"
+      - name: STUB_TOKEN_COUNT
+        value: "5"
+      - name: STUB_TOKEN_DELAY
+        value: "150ms"
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    # A fake extended resource advertised on the kind node via the node-status API,
+    # so the backend pod schedules with no GPU and no device plugin.
+    resourceName: hearth.dev/fake-gpu
+    sharing:
+      supported: false
+  health:
+    readiness:
+      httpGet:
+        path: /health
+        port: http
+    startup:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 2
+      failureThreshold: 30
+  lifecycle:
+    terminationGracePeriodSeconds: 30
+    preStopDrain: true
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:gpu_cache_usage_perc

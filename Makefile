@@ -98,6 +98,24 @@ test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expect
 cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
 
+# --- No-GPU scale-to-zero e2e (gateway + KEDA loop on the CPU vllm-stub) ---
+# Assumes a running Kind cluster (current kube-context) with KEDA already installed.
+SCALE_KIND_CLUSTER ?= kind
+SCALE_GATEWAY_IMG ?= hearth.dev/hearth-gateway:e2e
+
+.PHONY: load-scale-images
+load-scale-images: ## Build the stub + gateway images and load them into the Kind cluster (CONTAINER_TOOL-agnostic).
+	$(CONTAINER_TOOL) build -f Dockerfile.stub -t $(STUB_IMG) .
+	$(CONTAINER_TOOL) build -f Dockerfile.gateway -t $(SCALE_GATEWAY_IMG) .
+	$(CONTAINER_TOOL) save $(STUB_IMG) -o /tmp/hearth-stub.tar
+	$(KIND) load image-archive /tmp/hearth-stub.tar --name $(SCALE_KIND_CLUSTER)
+	$(CONTAINER_TOOL) save $(SCALE_GATEWAY_IMG) -o /tmp/hearth-gateway.tar
+	$(KIND) load image-archive /tmp/hearth-gateway.tar --name $(SCALE_KIND_CLUSTER)
+
+.PHONY: test-scale-e2e
+test-scale-e2e: manifests generate load-scale-images ## Run the no-GPU scale-to-zero e2e (needs a Kind cluster with KEDA).
+	go test -tags=e2e ./test/scaletozero/ -v -ginkgo.v -timeout 20m
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	"$(GOLANGCI_LINT)" run

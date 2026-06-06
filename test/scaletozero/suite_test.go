@@ -136,7 +136,7 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("removing test resources")
-	for _, f := range []string{"reject.yaml", "llmservice.yaml", "runtime.yaml"} {
+	for _, f := range []string{"reject.yaml", "drain.yaml", "llmservice.yaml", "runtime.yaml"} {
 		_, _ = kubectl("delete", "-f", filepath.Join("test", "scaletozero", "testdata", f), "--ignore-not-found")
 	}
 	_, _ = kubectl("delete", "namespace", ns, "--ignore-not-found")

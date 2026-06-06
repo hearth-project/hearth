@@ -12,8 +12,10 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o vllm-stub ./test/vllm-stub
 
-# Minimal distroless base
-FROM gcr.io/distroless/static:nonroot
+# Alpine (not distroless) so the image has /bin/sh: Hearth's graceful-drain renders a
+# preStop hook (`/bin/sh -c "sleep <drainTimeout>"`) on the serving container, exactly as
+# it would on a real vLLM image. A shell-less base would skip the hook and break drain.
+FROM alpine:3.20
 WORKDIR /
 COPY --from=builder /workspace/vllm-stub .
 USER 65532:65532

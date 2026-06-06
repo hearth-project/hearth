@@ -102,6 +102,47 @@ var _ = Describe("scale-to-zero loop", Ordered, func() {
 			Should(Equal(0), "the backend should scale back to zero once idle")
 	})
 
+	It("lets an in-flight stream finish while the backend is scaled down (drain)", func() {
+		applyManifest("drain.yaml")
+		Eventually(func() int { return backendReplicas("stub-drain") }, 2*time.Minute, 3*time.Second).
+			Should(Equal(0), "the drain service should start idle at zero")
+
+		cancel := portForward("stub-drain", 18083)
+		defer cancel()
+
+		// Launch a deliberately long stream (≈12s of tokens once warm) in the background.
+		type result struct {
+			code int
+			body string
+			err  error
+		}
+		done := make(chan result, 1)
+		go func() {
+			defer GinkgoRecover()
+			code, body, err := chat(18083, 80, true, 2*time.Minute)
+			done <- result{code, body, err}
+		}()
+
+		By("waiting for the backend pod to be Ready (the stream has started)")
+		Eventually(func() string {
+			out, _ := kubectl("get", "pods", "-n", ns, "-l", "serving.hearth.dev/llmservice=stub-drain",
+				"-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}")
+			return out
+		}, 2*time.Minute, 2*time.Second).Should(ContainSubstring("True"))
+
+		By("deleting the backend pod mid-stream (the scale-down termination path)")
+		out, err := kubectl("delete", "pod", "-n", ns,
+			"-l", "serving.hearth.dev/llmservice=stub-drain", "--wait=false")
+		Expect(err).NotTo(HaveOccurred(), out)
+
+		By("the in-flight stream completing despite the pod terminating")
+		var r result
+		Eventually(done, 90*time.Second).Should(Receive(&r))
+		Expect(r.err).NotTo(HaveOccurred())
+		Expect(r.code).To(Equal(http.StatusOK))
+		Expect(r.body).To(ContainSubstring("[DONE]"), "the stream must drain to completion, not truncate")
+	})
+
 	It("fast-503s in reject mode when the backend cannot schedule", func() {
 		applyManifest("reject.yaml")
 		cancel := portForward("stub-503", 18082)

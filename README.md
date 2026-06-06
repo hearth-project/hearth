@@ -115,42 +115,32 @@ with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
 
 ## Install
 
-> **Pre-release (`v0.1.0`):** prebuilt images aren't published yet, so build and push your own and
-> pass the tag to the chart. A tagged release will publish `ghcr.io/hearth-project/hearth` and
-> `hearth-gateway`, after which the chart installs without the `--set` overrides.
+> **`v0.1.0` — alpha.** Each release publishes the operator + gateway images and the chart to
+> `ghcr.io/hearth-project`, so install is one command — no building required. Still alpha and **not
+> production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
 
 Hearth needs **KEDA** for scale-to-zero (and optionally the **Prometheus Operator** for the
 ServiceMonitor + dashboard — Hearth degrades gracefully without it).
 
 ```bash
-# KEDA (required for autoscaling / scale-to-zero)
+# 1. KEDA (required for autoscaling / scale-to-zero)
 helm repo add kedacore https://kedacore.github.io/charts
 helm install keda kedacore/keda -n keda --create-namespace
 
-# Build + push the operator and gateway images (until a tagged release publishes them)
-make docker-build         docker-push         IMG=<your-registry>/hearth:v0.1.0
-make docker-build-gateway docker-push-gateway GATEWAY_IMG=<your-registry>/hearth-gateway:v0.1.0
+# 2. Hearth (CRDs + RBAC + operator). The chart defaults to the published
+#    ghcr.io/hearth-project images at this version — no --set needed.
+helm install hearth ./charts/hearth -n hearth-system --create-namespace
 
-# Hearth operator (CRDs + RBAC + controller)
-helm install hearth ./charts/hearth -n hearth-system --create-namespace \
-  --set image.registry=<your-registry> --set image.tag=v0.1.0
-
-# ⚠️ Helm v4 SSA CRD ownership conflict (if upgrading from kubectl-apply install)
-# Helm v4 applies CRDs via Server-Side Apply (SSA), which takes field-manager ownership.
-# If you previously installed Hearth CRDs via `kubectl apply` (e.g., via `make install`),
-# the Helm upgrade will fail with an ownership conflict error.
-# Symptom: "cannot patch <resource> because the object has been modified by
-# field manager '<helm-field-manager>' trying to change fields owned by ..."
-# Fix: Delete the existing CRDs first, then run helm install/upgrade:
-#   kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev
-#   helm install hearth ./charts/hearth ...
-# Or use `kubectl apply --server-side` for CRDs so both tools share the same field manager.
-
-# register a backend and deploy a model
+# 3. register a backend and deploy a model
 kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
 kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml
 kubectl get llmservice -w
 ```
+
+> **Upgrading from a `kubectl apply` CRD install?** Helm v4 applies CRDs via Server-Side Apply and
+> conflicts with CRDs previously installed by `kubectl apply` (e.g. `make install`). Either delete
+> them first — `kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev`
+> — or install CRDs with `kubectl apply --server-side` so both tools share a field manager.
 
 ## Architecture
 

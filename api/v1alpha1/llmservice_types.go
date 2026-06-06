@@ -46,6 +46,8 @@ type LLMServiceSpec struct {
 
 type ModelSpec struct {
 	// +optional
+	// catalogRef points to an external model catalog entry. Catalog resolution
+	// is currently not implemented in v0; use model.source.uri for now.
 	CatalogRef string `json:"catalogRef,omitempty"`
 
 	// +optional
@@ -53,7 +55,8 @@ type ModelSpec struct {
 }
 
 type ModelSource struct {
-	// uri is the model location: hf:// | modelscope:// | oci:// | s3:// | pvc://
+	// uri is the model location. Supported in v0: hf://, modelscope://.
+	// oci://, s3://, and pvc:// are currently tracked as not yet implemented.
 	URI string `json:"uri"`
 
 	// secretRef holds credentials for private sources (e.g. a ModelScope token).

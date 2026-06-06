@@ -53,9 +53,23 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           helm package charts/hearth --version "$VERSION" --app-version "$VERSION"
+      - name: Build release notes (curated highlights + contributor thanks)
+        run: |
+          bash hack/extract-changelog.sh "${GITHUB_REF_NAME}" > release-body.md || true
+          if [ ! -s release-body.md ]; then
+            echo "See [CHANGELOG.md](CHANGELOG.md) for details." > release-body.md
+          fi
+          {
+            echo
+            echo "---"
+            echo
+            echo "🙏 **Thanks to everyone who contributed to this release** — the merged PRs and first-time"
+            echo "contributors are credited under **What's Changed** and **New Contributors** below."
+          } >> release-body.md
       - name: Attach chart to the GitHub release
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+          body_path: release-body.md
           files: hearth-*.tgz

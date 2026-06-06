@@ -42,6 +42,24 @@ backend, renders the workload, caches the weights, and scales it to zero when id
 | Datacenter scale-out | **llm-d**, **KServe** | **Out of scope.** Hearth is the few-GPU, scale-to-zero, private end. |
 | Declarative lifecycle + scale-to-zero + vendor-neutral packaging | — | **This is Hearth.** |
 
+## Architecture
+
+`LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
+renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` that scales on the
+pending-request count of a small Hearth gateway, which buffers requests during cold start.
+
+```mermaid
+flowchart LR
+  client(["client"]) -->|OpenAI API| gw["Hearth Gateway"]
+  gw -->|forward when Ready| pods["vLLM pods (0..N)"]
+  keda["KEDA"] -->|"poll /hearth/queue"| gw
+  keda -->|"scale 0..N"| pods
+  pods -.->|load weights| cache[("cache")]
+```
+
+📖 See [`docs/architecture.md`](docs/architecture.md) for components, CRDs, and the full
+scale-to-zero data flow — and [`docs/observability.md`](docs/observability.md) for the dashboard.
+
 ## A 60-second example
 
 ```yaml
@@ -141,27 +159,6 @@ kubectl get llmservice -w
 > conflicts with CRDs previously installed by `kubectl apply` (e.g. `make install`). Either delete
 > them first — `kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev`
 > — or install CRDs with `kubectl apply --server-side` so both tools share a field manager.
-
-## Architecture
-
-`LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
-renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` that scales on the
-pending-request count of a small Hearth gateway, which buffers requests during cold start.
-
-```mermaid
-flowchart LR
-  client(["client"]) -->|OpenAI API| gw["Hearth Gateway"]
-  gw -->|forward when Ready| pods["vLLM pods (0..N)"]
-  keda["KEDA"] -->|"poll /hearth/queue"| gw
-  keda -->|"scale 0..N"| pods
-  pods -.->|load weights| cache[("cache")]
-```
-
-📖 See [`docs/architecture.md`](docs/architecture.md) for the components, CRDs, and the full
-scale-to-zero data flow.
-
-See [`docs/observability.md`](docs/observability.md) for the Grafana dashboard import steps and
-gateway metric reference.
 
 ## Roadmap
 

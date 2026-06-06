@@ -245,7 +245,7 @@ func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1a
 	}
 	meta.SetStatusCondition(&svc.Status.Conditions, cond)
 
-	if equality.Semantic.DeepEqual(oldStatus, &svc.Status) {
+	if apiequality.Semantic.DeepEqual(oldStatus, &svc.Status) {
 		return ctrl.Result{}, nil
 	}
 	if err := r.Status().Update(ctx, svc); err != nil {
@@ -265,7 +265,7 @@ func (r *LLMServiceReconciler) fail(ctx context.Context, svc *servingv1alpha1.LL
 		Message:            err.Error(),
 		ObservedGeneration: svc.Generation,
 	})
-	if equality.Semantic.DeepEqual(oldStatus, &svc.Status) {
+	if apiequality.Semantic.DeepEqual(oldStatus, &svc.Status) {
 		return ctrl.Result{}, nil
 	}
 	if uerr := r.Status().Update(ctx, svc); uerr != nil {

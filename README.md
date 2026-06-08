@@ -13,10 +13,6 @@ vendor-neutral across NVIDIA, Ascend, and more.**
 
 [**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Observability**](docs/observability.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
 
-<!-- Demo: drop a silent, looping GIF at docs/demo.gif (see hack/demo/), then uncomment:
-<img src="docs/demo.gif" alt="Hearth — scale-to-zero LLM serving on Kubernetes" width="820">
--->
-
 </div>
 
 Hearth is a Kubernetes operator that turns "run Qwen / DeepSeek / GLM on my private cluster" into a

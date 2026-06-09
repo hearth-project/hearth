@@ -42,7 +42,10 @@ func ScaledObjectName(svc *servingv1alpha1.LLMService) string { return svc.Name 
 // NOTE: this uses metrics-api (poll-based). A future optimization is a custom gRPC
 // external scaler with StreamIsActive (push) to shave the polling interval off the
 // first cold start; the gateway's request hold makes that latency invisible for now.
-func BuildScaledObject(svc *servingv1alpha1.LLMService) *unstructured.Unstructured {
+func BuildScaledObject(svc *servingv1alpha1.LLMService) (*unstructured.Unstructured, error) {
+	if m := svc.Spec.Scaling.Metric; m != "" && m != "queueDepth" {
+		return nil, fmt.Errorf("scaling.metric %q is not supported in v0; only queueDepth is wired to the autoscaler", m)
+	}
 	target := svc.Spec.Scaling.Target
 	if target <= 0 {
 		target = defaultTarget
@@ -81,5 +84,5 @@ func BuildScaledObject(svc *servingv1alpha1.LLMService) *unstructured.Unstructur
 	obj.SetNamespace(svc.Namespace)
 	obj.SetLabels(SelectorLabels(svc))
 	obj.Object["spec"] = spec
-	return obj
+	return obj, nil
 }

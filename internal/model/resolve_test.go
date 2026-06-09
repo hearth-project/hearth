@@ -61,3 +61,11 @@ func TestResolveErrors(t *testing.T) {
 	_, err = model.Resolve(servingv1alpha1.ModelSpec{CatalogRef: "qwen3-8b-instruct"})
 	g.Expect(err).To(HaveOccurred())
 }
+
+func TestResolveRejectsSecretRef(t *testing.T) {
+	g := NewWithT(t)
+	spec := src("modelscope://Qwen/Qwen3-8B-Instruct")
+	spec.Source.SecretRef = &corev1.LocalObjectReference{Name: "modelscope-token"}
+	_, err := model.Resolve(spec)
+	g.Expect(err).To(MatchError(ContainSubstring("secretRef")))
+}

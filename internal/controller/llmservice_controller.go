@@ -123,7 +123,11 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if err := r.applyOptional(ctx, &svc, backend.BuildScaledObject(&svc), "ScaledObject (autoscaling disabled)"); err != nil {
+	so, err := backend.BuildScaledObject(&svc)
+	if err != nil {
+		return r.fail(ctx, &svc, "ScaledObject", err)
+	}
+	if err := r.applyOptional(ctx, &svc, so, "ScaledObject (autoscaling disabled)"); err != nil {
 		return r.fail(ctx, &svc, "ApplyScaledObject", err)
 	}
 	if err := r.applyOptional(ctx, &svc, backend.BuildServiceMonitor(&svc), "ServiceMonitor (metrics scraping disabled)"); err != nil {

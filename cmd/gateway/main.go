@@ -18,6 +18,8 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -25,7 +27,16 @@ import (
 	"github.com/hearth-project/hearth/internal/gateway"
 )
 
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "Print version and exit.")
+	flag.Parse()
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+
 	cfg := gateway.ConfigFromEnv()
 	if cfg.BackendURL == "" {
 		log.Fatalf("%s is required", gateway.EnvBackendURL)
@@ -41,7 +52,7 @@ func main() {
 		addr = gateway.DefaultListenAddr
 	}
 
-	log.Printf("Hearth gateway listening on %s, backend %s", addr, cfg.BackendURL)
+	log.Printf("Hearth gateway version %s listening on %s, backend %s", version, addr, cfg.BackendURL)
 	if err := http.ListenAndServe(addr, gw.Handler()); err != nil { //nolint:gosec // G114: timeouts handled per-request
 		log.Fatalf("Gateway server failed: %v", err)
 	}

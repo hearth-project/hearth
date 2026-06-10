@@ -11,6 +11,8 @@
 # Build output and locally-installed tooling (controller-gen, kustomize,
 # setup-envtest, the manager binary, etc.)
 bin/
+# Stray binary from `go build ./test/vllm-stub/` (build to bin/ instead).
+/vllm-stub
 Dockerfile.cross
 
 # Distribution artifacts from `make build-installer` / helm packaging.

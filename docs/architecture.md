@@ -42,15 +42,47 @@ For one `LLMService`, the operator renders: a vLLM **Deployment** (it does *not*
 KEDA owns `0..N`), a backend **Service**, a **gateway** Deployment + Service, a model **cache**
 (PVC/HostPath) + optional **prewarm Job**, a KEDA **ScaledObject**, and a **ServiceMonitor**.
 
+```mermaid
+flowchart TD
+  llm["LLMService<br/>(+ InferenceRuntime)"] --> op["Hearth operator"]
+  op --> dep["vLLM Deployment<br/>(replicas owned by KEDA)"]
+  op --> bsvc["Backend Service"]
+  op --> gwd["Gateway Deployment + Service"]
+  op --> cache["Model cache (PVC/HostPath)<br/>+ optional prewarm Job"]
+  op --> so["KEDA ScaledObject"]
+  op --> sm["ServiceMonitor"]
+```
+
 ## Scale-to-zero data flow
 
-```
-client ──▶ gateway ──▶ backend Service ──▶ vLLM pod(s)
-             │  ▲                              ▲
-   /hearth/queue (pending)                     │ load weights from cache
-             │  └── KEDA metrics-api polls ────┘
-             ▼
-        KEDA ScaledObject ──▶ scales the Deployment 0..N
+```mermaid
+flowchart LR
+  client(["Inference client"])
+  subgraph dp["Data plane"]
+    gw["Hearth Gateway<br/>buffer · backpressure<br/>keepalive · drain"]
+  end
+  subgraph wl["Workload"]
+    svc["Backend Service"]
+    pods["vLLM pods (0..N)"]
+    cache[("Model cache<br/>PVC / HostPath")]
+  end
+  subgraph cp["Autoscaling"]
+    keda["KEDA core"]
+    so["ScaledObject"]
+  end
+  client -->|"OpenAI API"| gw
+  gw -->|"forward when Ready"| svc --> pods
+  pods -.->|"load weights"| cache
+  keda -->|"poll /hearth/queue (pending)"| gw
+  keda --> so
+  so -->|"scale 0..N"| pods
+
+  classDef plane fill:#eef6ff,stroke:#4a90d9,color:#1b3a5b;
+  classDef work fill:#f3f0ff,stroke:#8b5cf6,color:#3b2a6b;
+  classDef auto fill:#fff7ed,stroke:#fb923c,color:#7c3a12;
+  class gw plane;
+  class svc,pods,cache work;
+  class keda,so auto;
 ```
 
 1. **Idle** — KEDA holds the backend Deployment at **0**.
@@ -77,3 +109,5 @@ Cold-start cost is dominated by fetching + loading weights, so caching is what m
 usable. v0 supports `HostPath` and `NodeLocalPVC` (with a pinnable `storageClassName`), plus a
 prewarm Job that hydrates weights before first traffic. Node-local caches are per-node today;
 `SharedPVC` (RWX) for multi-node is on the roadmap.
+For clusters without a dynamic StorageClass, see the HostPath sample in
+[`config/samples/serving_v1alpha1_llmservice_hostpath.yaml`](../config/samples/serving_v1alpha1_llmservice_hostpath.yaml).

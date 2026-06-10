@@ -1,0 +1,35 @@
+# Run Prow-style slash commands from issue/PR comments (e.g. /lgtm, /approve, /hold).
+# Authorization for /lgtm and /approve is enforced against the root OWNERS file.
+name: prow-commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: jpmcb/prow-github-actions@v2.0.0
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          prow-commands: "/assign
+            /unassign
+            /approve
+            /retitle
+            /area
+            /kind
+            /priority
+            /remove
+            /lgtm
+            /close
+            /reopen
+            /lock
+            /milestone
+            /hold
+            /cc
+            /uncc"

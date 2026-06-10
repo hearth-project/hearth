@@ -6,10 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-06-02
+## [0.1.0] - 2026-06-06
 
-First **pre-release (alpha)**. The core thesis — declarative, scale-to-zero serving of self-hosted
-open-source LLMs on Kubernetes — is implemented and verified end-to-end on real NVIDIA GPUs.
+First **release (alpha)**. The core thesis — declarative, scale-to-zero serving of self-hosted
+open-source LLMs on Kubernetes — is implemented and verified end-to-end on real NVIDIA GPUs, and
+the full loop now runs in CI with no hardware.
 Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 
 ### Added
@@ -26,9 +27,15 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 - **Model caching** — `HostPath` and `NodeLocalPVC` (with pinnable `cache.storageClassName`,
   verified against Alibaba ESSD) + a prewarm Job.
 - **Observability** — per-gateway Prometheus metrics, `ServiceMonitor`, and a Grafana dashboard.
+- **No-GPU test harness** — a CPU `vllm-stub` and a kind + KEDA e2e that runs the full
+  `0→1→N→0` loop, backpressure (`429`/`503`), and graceful drain on every PR, no accelerator
+  required, plus a [no-GPU development guide](docs/no-gpu-development.md).
 - **Packaging** — Helm chart (operator + RBAC + CRDs) and multi-arch image build/release workflow.
 - **Project scaffolding** — README, ROADMAP, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, MAINTAINERS,
   GOVERNANCE, issue/PR templates, and a DCO check.
+
+### Changed
+- Operator skips no-op `LLMService` status updates, avoiding optimistic-concurrency churn.
 
 [Unreleased]: https://github.com/hearth-project/hearth/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/hearth-project/hearth/releases/tag/v0.1.0

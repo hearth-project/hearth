@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: qwen3-8b
+  name: qwen3-8b-hostpath
 spec:
   model:
     source:
@@ -25,10 +25,9 @@ spec:
     target: 10
     activationTimeout: 5m
   cache:
-    strategy: NodeLocalPVC
-    size: 60Gi
-    # Optional: set this for your cluster if you do not want to use the default StorageClass.
-    # storageClassName: <your-rwo-storage-class> # e.g. alicloud-disk-essd
+    # HostPath creates a node-local cache under /var/lib/hearth/cache/<namespace>-<service>.
+    # Use it on clusters without a dynamic StorageClass; the cache does not move across nodes.
+    strategy: HostPath
     prewarm: true
   endpoint:
     openAICompatible: true

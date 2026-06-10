@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -122,7 +123,11 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	if err := r.applyOptional(ctx, &svc, backend.BuildScaledObject(&svc), "ScaledObject (autoscaling disabled)"); err != nil {
+	so, err := backend.BuildScaledObject(&svc)
+	if err != nil {
+		return r.fail(ctx, &svc, "ScaledObject", err)
+	}
+	if err := r.applyOptional(ctx, &svc, so, "ScaledObject (autoscaling disabled)"); err != nil {
 		return r.fail(ctx, &svc, "ApplyScaledObject", err)
 	}
 	if err := r.applyOptional(ctx, &svc, backend.BuildServiceMonitor(&svc), "ServiceMonitor (metrics scraping disabled)"); err != nil {
@@ -219,6 +224,8 @@ func (r *LLMServiceReconciler) ensureCreated(ctx context.Context, owner *serving
 }
 
 func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1alpha1.LLMService, runtimeName string, dep *appsv1.Deployment) (ctrl.Result, error) {
+	oldStatus := svc.Status.DeepCopy()
+
 	phase := servingv1alpha1.PhasePending
 	switch {
 	case dep.Status.ReadyReplicas > 0:
@@ -242,6 +249,9 @@ func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1a
 	}
 	meta.SetStatusCondition(&svc.Status.Conditions, cond)
 
+	if apiequality.Semantic.DeepEqual(oldStatus, &svc.Status) {
+		return ctrl.Result{}, nil
+	}
 	if err := r.Status().Update(ctx, svc); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -250,6 +260,7 @@ func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1a
 
 func (r *LLMServiceReconciler) fail(ctx context.Context, svc *servingv1alpha1.LLMService, reason string, err error) (ctrl.Result, error) {
 	logf.FromContext(ctx).Error(err, "Failed to reconcile LLMService", "reason", reason)
+	oldStatus := svc.Status.DeepCopy()
 	svc.Status.Phase = servingv1alpha1.PhaseDegraded
 	meta.SetStatusCondition(&svc.Status.Conditions, metav1.Condition{
 		Type:               "Ready",
@@ -258,6 +269,9 @@ func (r *LLMServiceReconciler) fail(ctx context.Context, svc *servingv1alpha1.LL
 		Message:            err.Error(),
 		ObservedGeneration: svc.Generation,
 	})
+	if apiequality.Semantic.DeepEqual(oldStatus, &svc.Status) {
+		return ctrl.Result{}, nil
+	}
 	if uerr := r.Status().Update(ctx, svc); uerr != nil {
 		return ctrl.Result{}, uerr
 	}

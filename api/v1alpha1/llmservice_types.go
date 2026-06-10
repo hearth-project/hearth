@@ -60,6 +60,7 @@ type ModelSource struct {
 	URI string `json:"uri"`
 
 	// secretRef holds credentials for private sources (e.g. a ModelScope token).
+	// Not supported in v0: setting it fails reconcile until private sources land.
 	// +optional
 	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
@@ -91,6 +92,7 @@ type ResourceSpec struct {
 	Accelerators int32 `json:"accelerators,omitempty"`
 
 	// fraction requests a sub-device slice; valid only when the runtime supports sharing.
+	// Not supported in v0 (no runtime supports sharing yet): setting it fails reconcile.
 	// +optional
 	Fraction *AcceleratorFraction `json:"fraction,omitempty"`
 
@@ -122,6 +124,8 @@ type ScalingSpec struct {
 	// +optional
 	Max int32 `json:"max,omitempty"`
 
+	// metric selects the scaling signal. Only queueDepth is wired to the autoscaler
+	// in v0; kvCacheUtil is reserved and fails reconcile if selected.
 	// +kubebuilder:validation:Enum=queueDepth;kvCacheUtil
 	// +kubebuilder:default=queueDepth
 	// +optional
@@ -170,6 +174,8 @@ type CacheSpec struct {
 }
 
 type EndpointSpec struct {
+	// openAICompatible is informational in v0: the gateway always serves the
+	// OpenAI-compatible API. Reserved for future protocol selection.
 	// +kubebuilder:default=true
 	// +optional
 	OpenAICompatible bool `json:"openAICompatible,omitempty"`

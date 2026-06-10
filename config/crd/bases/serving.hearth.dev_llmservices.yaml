@@ -104,6 +104,9 @@ spec:
                     type: object
                   openAICompatible:
                     default: true
+                    description: |-
+                      openAICompatible is informational in v0: the gateway always serves the
+                      OpenAI-compatible API. Reserved for future protocol selection.
                     type: boolean
                 type: object
               model:
@@ -113,8 +116,9 @@ spec:
                   source:
                     properties:
                       secretRef:
-                        description: secretRef holds credentials for private sources
-                          (e.g. a ModelScope token).
+                        description: |-
+                          secretRef holds credentials for private sources (e.g. a ModelScope token).
+                          Not supported in v0: setting it fails reconcile until private sources land.
                         properties:
                           name:
                             default: ""
@@ -151,8 +155,9 @@ spec:
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   fraction:
-                    description: fraction requests a sub-device slice; valid only
-                      when the runtime supports sharing.
+                    description: |-
+                      fraction requests a sub-device slice; valid only when the runtime supports sharing.
+                      Not supported in v0 (no runtime supports sharing yet): setting it fails reconcile.
                     properties:
                       cores:
                         format: int32
@@ -215,6 +220,9 @@ spec:
                     type: integer
                   metric:
                     default: queueDepth
+                    description: |-
+                      metric selects the scaling signal. Only queueDepth is wired to the autoscaler
+                      in v0; kvCacheUtil is reserved and fails reconcile if selected.
                     enum:
                     - queueDepth
                     - kvCacheUtil

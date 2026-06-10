@@ -1,0 +1,26 @@
+# Configures GitHub's auto-generated release notes ("What's Changed" + "New Contributors"),
+# which the release workflow appends below the curated CHANGELOG highlights.
+changelog:
+  exclude:
+    authors:
+      - dependabot
+      - dependabot[bot]
+      - github-actions
+      - github-actions[bot]
+  categories:
+    - title: 🚀 Features
+      labels:
+        - enhancement
+    - title: 🐛 Fixes
+      labels:
+        - bug
+    - title: 📖 Documentation
+      labels:
+        - documentation
+    - title: 🧪 Tests & CI
+      labels:
+        - test
+        - ci
+    - title: 🔧 Other Changes
+      labels:
+        - "*"

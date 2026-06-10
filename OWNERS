@@ -1,0 +1,9 @@
+# Prow-style OWNERS file, read by jpmcb/prow-github-actions to authorize commands.
+#   approvers -> may use /approve   reviewers -> may use /lgtm
+# A user must be listed in BOTH roles to use both commands
+# (the approvers role does not imply the reviewers role).
+approvers:
+  - kube-gopher
+
+reviewers:
+  - kube-gopher

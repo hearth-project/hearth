@@ -124,6 +124,9 @@ func WholeDeviceAccelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1
 	if name == "" {
 		return AcceleratorRequest{}, fmt.Errorf("runtime %q has no accelerator.resourceName", rt.Name)
 	}
+	if svc.Spec.Resources.Fraction != nil {
+		return AcceleratorRequest{}, fmt.Errorf("resources.fraction is not supported in v0; runtime %q serves whole devices, set resources.accelerators instead", rt.Name)
+	}
 	count := svc.Spec.Resources.Accelerators
 	if count <= 0 {
 		count = 1

@@ -131,6 +131,48 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(updated.Status.EndpointURL).To(ContainSubstring(svcName))
 		})
 
+		It("resolves the runtime via vendor selector", func() {
+			// decoy: a higher-priority runtime of another vendor must not match [nvidia]
+			decoy := &servingv1alpha1.InferenceRuntime{
+				ObjectMeta: metav1.ObjectMeta{Name: "vllm-ascend-decoy"},
+				Spec: servingv1alpha1.InferenceRuntimeSpec{
+					Family:   "vllm",
+					Vendor:   "ascend",
+					Priority: 100,
+					Container: servingv1alpha1.RuntimeContainer{
+						Image: "quay.io/ascend/vllm-ascend:v0.18.0",
+						Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
+					},
+					Accelerator: servingv1alpha1.AcceleratorSpec{ResourceName: "huawei.com/Ascend910"},
+					Metrics:     servingv1alpha1.RuntimeMetrics{Path: "/metrics", Port: "http", QueueDepth: "vllm:num_requests_waiting"},
+				},
+			}
+			Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, decoy))).To(Succeed())
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, decoy))).To(Succeed())
+			})
+
+			selSvc := &servingv1alpha1.LLMService{
+				ObjectMeta: metav1.ObjectMeta{Name: svcName + "-sel", Namespace: namespace},
+				Spec: servingv1alpha1.LLMServiceSpec{
+					Model:   servingv1alpha1.ModelSpec{Source: &servingv1alpha1.ModelSource{URI: "modelscope://Qwen/Qwen3-8B-Instruct"}},
+					Runtime: servingv1alpha1.RuntimeSelection{Selector: &servingv1alpha1.RuntimeSelector{Vendor: []string{"nvidia"}}},
+				},
+			}
+			Expect(k8sClient.Create(ctx, selSvc)).To(Succeed())
+			DeferCleanup(func() {
+				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, selSvc))).To(Succeed())
+			})
+
+			selKey := types.NamespacedName{Name: selSvc.Name, Namespace: namespace}
+			_, err := reconciler().Reconcile(ctx, reconcile.Request{NamespacedName: selKey})
+			Expect(err).NotTo(HaveOccurred())
+
+			updated := &servingv1alpha1.LLMService{}
+			Expect(k8sClient.Get(ctx, selKey, updated)).To(Succeed())
+			Expect(updated.Status.ResolvedRuntime).To(Equal(runtimeName))
+		})
+
 		It("is idempotent across repeated reconciles", func() {
 			_, err := reconciler().Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).NotTo(HaveOccurred())

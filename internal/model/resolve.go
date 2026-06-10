@@ -38,6 +38,10 @@ func Resolve(model servingv1alpha1.ModelSpec) (backend.ResolvedModel, error) {
 		return backend.ResolvedModel{}, fmt.Errorf("model.source.uri is required")
 	}
 
+	if model.Source.SecretRef != nil {
+		return backend.ResolvedModel{}, fmt.Errorf("model.source.secretRef is not supported yet; use a public model source or remove it")
+	}
+
 	scheme, ref, ok := strings.Cut(model.Source.URI, "://")
 	if !ok || ref == "" {
 		return backend.ResolvedModel{}, fmt.Errorf("invalid model uri %q: expected scheme://reference", model.Source.URI)

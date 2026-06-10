@@ -37,7 +37,8 @@ func scalingService() *servingv1alpha1.LLMService {
 
 func TestScaledObjectMetricsAPITrigger(t *testing.T) {
 	g := NewWithT(t)
-	so := backend.BuildScaledObject(scalingService())
+	so, err := backend.BuildScaledObject(scalingService())
+	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(so.GetAPIVersion()).To(Equal("keda.sh/v1alpha1"))
 	g.Expect(so.GetKind()).To(Equal("ScaledObject"))
@@ -57,4 +58,16 @@ func TestScaledObjectMetricsAPITrigger(t *testing.T) {
 	g.Expect(md["valueLocation"]).To(Equal("pending"))
 	g.Expect(md["targetValue"]).To(Equal("10"))
 	g.Expect(md["activationTargetValue"]).To(Equal("0"))
+}
+
+func TestScaledObjectRejectsUnimplementedMetric(t *testing.T) {
+	g := NewWithT(t)
+	svc := scalingService()
+	svc.Spec.Scaling.Metric = "kvCacheUtil"
+	_, err := backend.BuildScaledObject(svc)
+	g.Expect(err).To(MatchError(ContainSubstring("kvCacheUtil")))
+
+	svc.Spec.Scaling.Metric = "queueDepth"
+	_, err = backend.BuildScaledObject(svc)
+	g.Expect(err).NotTo(HaveOccurred())
 }

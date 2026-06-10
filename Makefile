@@ -2,6 +2,10 @@
 IMG ?= ghcr.io/hearth-project/hearth:latest
 # YEAR defines the year value used for substituting the YEAR placeholder in the boilerplate header.
 YEAR ?= $(shell date +%Y)
+# VERSION is injected into manager and gateway binaries. Tagged builds use the
+# nearest git tag, while local builds fall back to dev outside a git checkout.
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
+LDFLAGS ?= -X main.version=$(VERSION)
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -94,6 +98,24 @@ test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expect
 cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
 
+# --- No-GPU scale-to-zero e2e (gateway + KEDA loop on the CPU vllm-stub) ---
+# Assumes a running Kind cluster (current kube-context) with KEDA already installed.
+SCALE_KIND_CLUSTER ?= kind
+SCALE_GATEWAY_IMG ?= hearth.dev/hearth-gateway:e2e
+
+.PHONY: load-scale-images
+load-scale-images: ## Build the stub + gateway images and load them into the Kind cluster (CONTAINER_TOOL-agnostic).
+	$(CONTAINER_TOOL) build -f Dockerfile.stub -t $(STUB_IMG) .
+	$(CONTAINER_TOOL) build -f Dockerfile.gateway -t $(SCALE_GATEWAY_IMG) .
+	$(CONTAINER_TOOL) save $(STUB_IMG) -o /tmp/hearth-stub.tar
+	$(KIND) load image-archive /tmp/hearth-stub.tar --name $(SCALE_KIND_CLUSTER)
+	$(CONTAINER_TOOL) save $(SCALE_GATEWAY_IMG) -o /tmp/hearth-gateway.tar
+	$(KIND) load image-archive /tmp/hearth-gateway.tar --name $(SCALE_KIND_CLUSTER)
+
+.PHONY: test-scale-e2e
+test-scale-e2e: manifests generate load-scale-images ## Run the no-GPU scale-to-zero e2e (needs a Kind cluster with KEDA).
+	go test -tags=e2e ./test/scaletozero/ -v -ginkgo.v -timeout 20m
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	"$(GOLANGCI_LINT)" run
@@ -109,8 +131,9 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 ##@ Build
 
 .PHONY: build
-build: manifests generate fmt vet ## Build manager binary.
-	go build -o bin/manager cmd/main.go
+build: manifests generate fmt vet ## Build manager and gateway binaries.
+	go build -ldflags "$(LDFLAGS)" -o bin/manager cmd/main.go
+	go build -ldflags "$(LDFLAGS)" -o bin/gateway ./cmd/gateway
 
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
@@ -121,7 +144,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
-	$(CONTAINER_TOOL) build -t ${IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -131,11 +154,17 @@ GATEWAY_IMG ?= ghcr.io/hearth-project/hearth-gateway:latest
 
 .PHONY: docker-build-gateway
 docker-build-gateway: ## Build the data-plane gateway image.
-	$(CONTAINER_TOOL) build -f Dockerfile.gateway -t ${GATEWAY_IMG} .
+	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -f Dockerfile.gateway -t ${GATEWAY_IMG} .
 
 .PHONY: docker-push-gateway
 docker-push-gateway: ## Push the data-plane gateway image.
 	$(CONTAINER_TOOL) push ${GATEWAY_IMG}
+
+STUB_IMG ?= hearth.dev/vllm-stub:e2e
+
+.PHONY: docker-build-stub
+docker-build-stub: ## Build the CPU vllm-stub image used by the no-GPU e2e harness.
+	$(CONTAINER_TOOL) build -f Dockerfile.stub -t ${STUB_IMG} .
 
 .PHONY: helm-crds
 helm-crds: manifests ## Sync generated CRDs into the Helm chart's crds/ directory.
@@ -154,7 +183,7 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name hearth-builder
 	$(CONTAINER_TOOL) buildx use hearth-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross .
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --build-arg VERSION=$(VERSION) --tag ${IMG} -f Dockerfile.cross .
 	- $(CONTAINER_TOOL) buildx rm hearth-builder
 	rm Dockerfile.cross
 

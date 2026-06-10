@@ -60,6 +60,9 @@ real accelerator node is available (serving tokens requires an NVIDIA GPU + devi
 data-plane gateway to start, build/push it and pass `--gateway-image=<registry>/hearth-gateway:<tag>`
 to the operator (`go run ./cmd/main.go --gateway-image=...`).
 
+To exercise the **gateway and the full scale-to-zero path with no GPU**, use the `vllm-stub` (a CPU
+fake of a vLLM server) — see [Developing without a GPU](docs/no-gpu-development.md).
+
 ### End-to-end tests
 
 ```bash

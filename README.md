@@ -11,7 +11,7 @@ vendor-neutral across NVIDIA, Ascend, and more.**
 [![CI](https://github.com/hearth-project/hearth/actions/workflows/test.yml/badge.svg)](https://github.com/hearth-project/hearth/actions/workflows/test.yml)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-[**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
+[**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Observability**](docs/observability.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
@@ -41,6 +41,24 @@ backend, renders the workload, caches the weights, and scales it to zero when id
 | GPU/NPU scheduling | device plugins, **HAMi**, **Volcano** | **Builds on.** Targets their resources; never replaces them. |
 | Datacenter scale-out | **llm-d**, **KServe** | **Out of scope.** Hearth is the few-GPU, scale-to-zero, private end. |
 | Declarative lifecycle + scale-to-zero + vendor-neutral packaging | — | **This is Hearth.** |
+
+## Architecture
+
+`LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
+renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` that scales on the
+pending-request count of a small Hearth gateway, which buffers requests during cold start.
+
+```mermaid
+flowchart LR
+  client(["client"]) -->|OpenAI API| gw["Hearth Gateway"]
+  gw -->|forward when Ready| pods["vLLM pods (0..N)"]
+  keda["KEDA"] -->|"poll /hearth/queue"| gw
+  keda -->|"scale 0..N"| pods
+  pods -.->|load weights| cache[("cache")]
+```
+
+📖 See [`docs/architecture.md`](docs/architecture.md) for components, CRDs, and the full
+scale-to-zero data flow — and [`docs/observability.md`](docs/observability.md) for the dashboard.
 
 ## A 60-second example
 
@@ -115,40 +133,32 @@ with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
 
 ## Install
 
-> **Pre-release (`v0.1.0`):** prebuilt images aren't published yet, so build and push your own and
-> pass the tag to the chart. A tagged release will publish `ghcr.io/hearth-project/hearth` and
-> `hearth-gateway`, after which the chart installs without the `--set` overrides.
+> **`v0.1.0` — alpha.** Each release publishes the operator + gateway images and the chart to
+> `ghcr.io/hearth-project`, so install is one command — no building required. Still alpha and **not
+> production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
 
 Hearth needs **KEDA** for scale-to-zero (and optionally the **Prometheus Operator** for the
 ServiceMonitor + dashboard — Hearth degrades gracefully without it).
 
 ```bash
-# KEDA (required for autoscaling / scale-to-zero)
+# 1. KEDA (required for autoscaling / scale-to-zero)
 helm repo add kedacore https://kedacore.github.io/charts
 helm install keda kedacore/keda -n keda --create-namespace
 
-# Build + push the operator and gateway images (until a tagged release publishes them)
-make docker-build         docker-push         IMG=<your-registry>/hearth:v0.1.0
-make docker-build-gateway docker-push-gateway GATEWAY_IMG=<your-registry>/hearth-gateway:v0.1.0
+# 2. Hearth (CRDs + RBAC + operator). The chart defaults to the published
+#    ghcr.io/hearth-project images at this version — no --set needed.
+helm install hearth ./charts/hearth -n hearth-system --create-namespace
 
-# Hearth operator (CRDs + RBAC + controller)
-helm install hearth ./charts/hearth -n hearth-system --create-namespace \
-  --set image.registry=<your-registry> --set image.tag=v0.1.0
-
-# register a backend and deploy a model
+# 3. register a backend and deploy a model
 kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
 kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml
 kubectl get llmservice -w
 ```
 
-## Architecture
-
-`LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
-renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` whose external
-scaler is a small Hearth gateway that buffers requests during cold start.
-
-📖 See [`docs/architecture.md`](docs/architecture.md) for the components, CRDs, and the full
-scale-to-zero data flow.
+> **Upgrading from a `kubectl apply` CRD install?** Helm v4 applies CRDs via Server-Side Apply and
+> conflicts with CRDs previously installed by `kubectl apply` (e.g. `make install`). Either delete
+> them first — `kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev`
+> — or install CRDs with `kubectl apply --server-side` so both tools share a field manager.
 
 ## Roadmap
 

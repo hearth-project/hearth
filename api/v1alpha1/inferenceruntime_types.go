@@ -105,6 +105,8 @@ type RuntimeScheduler struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 
+	// queue is rendered as the scheduling.volcano.sh/queue-name pod annotation;
+	// only meaningful together with name: volcano.
 	// +optional
 	Queue string `json:"queue,omitempty"`
 }

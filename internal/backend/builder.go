@@ -34,6 +34,8 @@ const (
 	nameLabel       = "app.kubernetes.io/name"
 	llmServiceLabel = "serving.hearth.dev/llmservice"
 	runtimeLabel    = "serving.hearth.dev/runtime"
+
+	volcanoQueueAnnotation = "scheduling.volcano.sh/queue-name"
 )
 
 // SelectorLabels are the immutable labels identifying one LLMService's pods.
@@ -85,6 +87,11 @@ func BuildDeployment(a BackendAdapter, svc *servingv1alpha1.LLMService, rt *serv
 				Spec:       pod,
 			},
 		},
+	}
+	// Volcano's podgroup controller derives the queue from this pod annotation;
+	// Hearth never creates PodGroups itself (reuse the scheduler, don't replace it).
+	if accel.Queue != "" {
+		dep.Spec.Template.Annotations = map[string]string{volcanoQueueAnnotation: accel.Queue}
 	}
 	return dep, nil
 }

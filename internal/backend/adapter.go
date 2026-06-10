@@ -41,6 +41,8 @@ type AcceleratorRequest struct {
 	NodeSelector  map[string]string
 	Tolerations   []corev1.Toleration
 	SchedulerName string
+	// Queue is the Volcano queue, rendered as a pod annotation (see BuildDeployment).
+	Queue string
 }
 
 type MetricsSource struct {

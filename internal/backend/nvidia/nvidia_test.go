@@ -127,6 +127,22 @@ func TestBuildDeploymentAssembles(t *testing.T) {
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceName("nvidia.com/gpu")))
 }
 
+func TestBuildDeploymentRendersVolcanoQueue(t *testing.T) {
+	g := NewWithT(t)
+	rt := sampleRuntime()
+	rt.Spec.Accelerator.Scheduler = servingv1alpha1.RuntimeScheduler{Name: "volcano", Queue: "inference"}
+
+	dep, err := backend.BuildDeployment(nvidia.New(), sampleService(), rt, resolvedModel())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(dep.Spec.Template.Spec.SchedulerName).To(Equal("volcano"))
+	g.Expect(dep.Spec.Template.Annotations).To(HaveKeyWithValue("scheduling.volcano.sh/queue-name", "inference"))
+
+	// without a queue, no Volcano annotation is rendered
+	plain, err := backend.BuildDeployment(nvidia.New(), sampleService(), sampleRuntime(), resolvedModel())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(plain.Spec.Template.Annotations).NotTo(HaveKey("scheduling.volcano.sh/queue-name"))
+}
+
 func TestPodSpecRejectsBadTemplate(t *testing.T) {
 	g := NewWithT(t)
 	rt := sampleRuntime()

@@ -80,6 +80,9 @@ spec:
                           scheduler.
                         type: string
                       queue:
+                        description: |-
+                          queue is rendered as the scheduling.volcano.sh/queue-name pod annotation;
+                          only meaningful together with name: volcano.
                         type: string
                     type: object
                   sharing:

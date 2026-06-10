@@ -136,6 +136,7 @@ func WholeDeviceAccelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1
 		NodeSelector:  rt.Spec.Accelerator.NodeSelector,
 		Tolerations:   rt.Spec.Accelerator.Tolerations,
 		SchedulerName: rt.Spec.Accelerator.Scheduler.Name,
+		Queue:         rt.Spec.Accelerator.Scheduler.Queue,
 	}, nil
 }
 

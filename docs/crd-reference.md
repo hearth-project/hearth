@@ -16,9 +16,9 @@ shown below when a default is defined.
 | Field | Type | Default / enum | Description |
 |---|---|---|---|
 | `spec.model` | object | required | Model identity and source. |
-| `spec.model.catalogRef` | string | - | Optional catalog entry name for a model resolved outside the inline source block. |
+| `spec.model.catalogRef` | string | - | Optional catalog entry name for a model resolved outside the inline source block. 🚧 **Not yet implemented in v0** — use `spec.model.source.uri` instead. See [#33](https://github.com/hearth-project/hearth/issues/33). |
 | `spec.model.source` | object | - | Inline model source configuration. |
-| `spec.model.source.uri` | string | required when `source` is set | Model location. Supported URI families are `hf://`, `modelscope://`, `oci://`, `s3://`, and `pvc://`. |
+| `spec.model.source.uri` | string | required when `source` is set | Model location. Supported in v0: `hf://`, `modelscope://`. `oci://`, `s3://`, and `pvc://` are currently not implemented yet. See [#36](https://github.com/hearth-project/hearth/issues/36). |
 | `spec.model.source.secretRef` | object | - | Credentials for private model sources, represented as a Kubernetes `LocalObjectReference`. |
 | `spec.model.source.secretRef.name` | string | `""` | Name of the Secret holding source credentials. |
 | `spec.runtime` | object | - | Backend runtime selection. Pin a runtime by name or provide a vendor preference selector. |
@@ -42,7 +42,7 @@ shown below when a default is defined.
 | `spec.scaling.scaleDownStabilization` | duration string | `5m` | Stabilization window before scaling down after demand drops. |
 | `spec.scaling.drainTimeout` | duration string | `2m` | Time allowed for in-flight requests to drain. Must be no greater than the runtime termination grace period. |
 | `spec.cache` | object | - | Model-weight cache configuration for reducing cold-start downloads. |
-| `spec.cache.strategy` | string | default `NodeLocalPVC`; enum `NodeLocalPVC`, `HostPath`, `SharedPVC`, `BakedImage`, `None` | Cache backend. `SharedPVC` is listed in the API but is not supported in v0. |
+| `spec.cache.strategy` | string | default `NodeLocalPVC`; enum `NodeLocalPVC`, `HostPath`, `SharedPVC`, `BakedImage`, `None` | Cache backend. `SharedPVC` is listed in the API but not yet supported in v0; tracked in [#37](https://github.com/hearth-project/hearth/issues/37). `BakedImage` is also not implemented in v0 yet; tracked in [#33](https://github.com/hearth-project/hearth/issues/33). |
 | `spec.cache.size` | quantity | - | Requested cache PVC size for `NodeLocalPVC`. |
 | `spec.cache.storageClassName` | string | - | StorageClass for the cache PVC. Empty uses the cluster default. |
 | `spec.cache.prewarm` | boolean | - | Whether to hydrate model weights into the persistent cache before first traffic. |

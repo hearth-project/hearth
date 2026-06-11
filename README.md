@@ -2,8 +2,8 @@
 
 # 🔥 Hearth
 
-**Declarative, scale-to-zero serving for domestic open-source LLMs on your own Kubernetes —
-vendor-neutral across NVIDIA, Ascend, and more.**
+**Scale-to-zero serving for open-source LLMs on Kubernetes — one CRD + KEDA, no platform to
+adopt. Vendor-neutral across NVIDIA, Ascend, and more.**
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/hearth-project/hearth)](go.mod)
@@ -15,11 +15,12 @@ vendor-neutral across NVIDIA, Ascend, and more.**
 
 </div>
 
-Hearth is a Kubernetes operator that turns "run Qwen / DeepSeek / GLM on my private cluster" into a
-single `LLMService` manifest: declarative deploy, queue-driven autoscaling, and **scale-to-zero** —
-with NVIDIA-vLLM / vLLM-Ascend / vLLM-MLU as **pluggable backends** behind one API.
+Hearth is a small Kubernetes operator that turns "run Qwen / DeepSeek / GLM on my private cluster"
+into a single `LLMService` manifest: declarative deploy, queue-driven autoscaling, and
+**scale-to-zero** — with NVIDIA-vLLM / vLLM-Ascend (Cambricon planned) as **pluggable backends**
+behind one API, and nothing else to adopt.
 
-> **Status — pre-release `v0.1.0` (alpha).** The NVIDIA backend and the full scale-to-zero path
+> **Status — `v0.1.0` (alpha).** The NVIDIA backend and the full scale-to-zero path
 > (gateway + KEDA) are **implemented and verified end-to-end on real NVIDIA GPUs** — cold-start
 > keepalive, graceful drain, model caching/prewarm, 1→N autoscaling, and observability. The
 > **Ascend** backend is scaffolded and golden-tested (renders correct manifests) but **not yet
@@ -28,10 +29,21 @@ with NVIDIA-vLLM / vLLM-Ascend / vLLM-MLU as **pluggable backends** behind one A
 
 ## Why Hearth
 
-The "deploy an LLM on K8s" space is crowded but **NVIDIA-first and English-first**. Hearth's design
-center is different: **vendor-neutral, domestic-runtime-first orchestration**, with private/"XinChuang"
-delivery as a first-class concern. You write the model and the scaling intent; Hearth picks the
-backend, renders the workload, caches the weights, and scales it to zero when idle.
+The "LLM on K8s" space has excellent **platforms**: [KServe](https://kserve.github.io/website/) +
+[llm-d](https://llm-d.ai/) at datacenter scale, [AIBrix](https://github.com/vllm-project/aibrix) as
+vLLM's control plane, [Kthena](https://github.com/volcano-sh/kthena) for fleet-grade serving. Hearth
+is deliberately **not a platform**. It is the *smallest* thing that serves a few open-source LLMs
+well on a few accelerators:
+
+- **One user-facing CRD + KEDA.** No router fleet, no webhook suite, no new autoscaler to learn —
+  if KEDA runs on your cluster, you're most of the way there. Degrades gracefully when
+  KEDA/Prometheus are absent.
+- **Scale-to-zero is the center of gravity.** Idle models hold **zero** accelerators; a small
+  gateway buffers the cold-start request and KEDA wakes the backend.
+- **Vendor-neutral, domestic-silicon-friendly.** The same manifest runs on NVIDIA or Ascend;
+  backends are *data*, not code. Private/"XinChuang" delivery is a first-class concern.
+- **Small enough to audit** in an afternoon (~5K lines of Go), light enough for edge boxes and
+  air-gapped clusters.
 
 **What Hearth does — and deliberately does not do:**
 
@@ -39,8 +51,21 @@ backend, renders the workload, caches the weights, and scales it to zero when id
 |---|---|---|
 | Inference engine | vLLM (+ `vllm-ascend` / `vllm-mlu`) | **Uses it.** Never re-implements; writes no chip kernels. |
 | GPU/NPU scheduling | device plugins, **HAMi**, **Volcano** | **Builds on.** Targets their resources; never replaces them. |
-| Datacenter scale-out | **llm-d**, **KServe** | **Out of scope.** Hearth is the few-GPU, scale-to-zero, private end. |
-| Declarative lifecycle + scale-to-zero + vendor-neutral packaging | — | **This is Hearth.** |
+| Serving platforms (routing, fleets, P/D disaggregation, datacenter scale-out) | **Kthena**, **AIBrix**, **KServe**/**llm-d** | **Complementary.** Hearth is the no-platform end of the same axis. |
+| Declarative lifecycle + scale-to-zero + vendor-neutral packaging, at the small end | — | **This is Hearth.** |
+
+### Hearth and Kthena
+
+[Kthena](https://github.com/volcano-sh/kthena), a [Volcano](https://volcano.sh/) sub-project, is a
+Kubernetes-native AI serving **platform**: multi-model routing, KV-cache-aware scheduling,
+prefill/decode disaggregation, and fleet-scale autoscaling, with first-class NPU support. If you run
+a serious multi-model serving estate, **use Kthena — it's excellent.** Hearth lives at the other end
+of the same axis: a handful of occasionally-used models on a handful of cards, where you want the
+smallest possible footprint — one manifest, KEDA, done. The two compose naturally on one cluster:
+**hot, high-traffic models on Kthena; the long tail scaled to zero with Hearth**, on the same
+(Volcano-schedulable) silicon. We also share operational lessons from Hearth's verified
+scale-to-zero path with Kthena's scale-to-zero design
+([kthena#1019](https://github.com/volcano-sh/kthena/issues/1019)).
 
 ## Architecture
 
@@ -164,7 +189,7 @@ kubectl get llmservice -w
 
 See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what v0 is (and isn't) good for.
 
-- **v0 — `v0.1.0` pre-release (now)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
+- **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
 - **v1** — Ascend running on real NPUs; HAMi/Volcano integration; curated domestic-model catalog.

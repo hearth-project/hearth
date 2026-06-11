@@ -25,9 +25,9 @@ side of that line.
   golden tests. This is the project's whole thesis; high-value.
 - **Validate on real hardware** — especially **Ascend NPU** (the v1 milestone) — the adapter is
   scaffolded and golden-tested but unproven on silicon. Real-hardware reports are gold.
-- **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P0/P1** items (gateway auth,
-  HA hardening, multi-node image distribution, `SharedPVC`, `imagePullSecrets`, the no-GPU e2e
-  harness) are great entry points.
+- **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P1/P2** items
+  (`imagePullSecrets`, `pvc://`/`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
+  and the **community track** (the KEDA external push scaler, #42) are great entry points.
 - **Docs, samples, bug reports, repros** — all welcome, no change too small.
 
 Look for issues labeled **`good first issue`** / **`help wanted`**, or open one to discuss before a

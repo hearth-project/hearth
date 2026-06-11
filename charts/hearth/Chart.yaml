@@ -1,6 +1,6 @@
 apiVersion: v2
 name: hearth
-description: Declarative, scale-to-zero serving for domestic open-source LLMs on Kubernetes — vendor-neutral across NVIDIA, Ascend, and more.
+description: Scale-to-zero serving for open-source LLMs on Kubernetes — one CRD + KEDA, no platform to adopt. Vendor-neutral across NVIDIA, Ascend, and more.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

@@ -29,6 +29,8 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
 - **Packaging** — Helm chart installs operator + RBAC; verified reconciling under chart RBAC.
 - **Multi-backend abstraction** — NVIDIA implemented & run; **Ascend** scaffolded + golden-tested
   (renders correct manifests) but **not yet run on real NPUs**.
+- **No-GPU CI loop** — the full `0→1→N→0` scale-to-zero e2e (CPU `vllm-stub` + a fake extended
+  resource on kind) runs in CI; contributing needs no accelerator.
 
 ## Production readiness
 
@@ -43,41 +45,65 @@ anything requiring auth, SLAs, or stability guarantees.
 
 ## Path to production
 
-### P0 — blockers for any shared / exposed use
-- [ ] **Gateway authN/authZ** — API keys / token auth on the OpenAI endpoint; per-model access
-      control. Today any in-cluster caller can hit any model.
-- [ ] **Gateway HA hardening** — default is 1 replica (SPOF). Add `PodDisruptionBudget` +
-      pod anti-affinity, and **aggregate the demand signal across replicas** (KEDA currently polls a
-      single gateway's pending count, which softens activation at >1 replica).
+### Now — the v1 milestone: Ascend on real NPUs (310P-first)
+- [ ] **Validate the Ascend backend on real hardware.** Cheapest credible path first: **Ascend 310P**
+      (Atlas 300I Pro/Duo) — vllm-ascend ships dedicated `-310p` images and a runtime sample is
+      already in-repo (`config/samples/serving_v1alpha1_inferenceruntime_ascend_310p.yaml`).
+      Deliverables: a bring-up runbook, cold-start numbers, and the honest claim *"functionally
+      validated on 310P"*. **910B** follows for performance claims.
+- [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
+      is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi
+      sharing / gang scheduling follows.
+
+### P1 — unblock private / enterprise delivery
+- [ ] **`imagePullSecrets`** — private-registry support on backend/prewarm/gateway (Xinchuang/enterprise).
+- [ ] **`pvc://` + `oci://` model sources** — pre-staged weights, no egress at serve time; the
+      prerequisite for the air-gapped bundle.
+- [ ] **`SharedPVC` (RWX) cache** — node-local cache is per-node today, so each new replica
+      re-downloads weights; RWX shared cache fixes multi-node cold starts.
 - [ ] **Reliable multi-node scale-out** — a replica on a node without the runtime image cached pays a
       multi-minute image pull, and **KEDA scale-down churn can cancel an in-progress pull** so the
       replica never becomes Ready under bursty load (observed on the 2-node A100 run). Ship guidance +
       support for **image pre-distribution**: VPC/in-region registry endpoints, node image pre-pull
       (DaemonSet / ACK ImageCache), and/or a `scaleDownStabilization` floor that won't cancel pulls.
-
-### P1 — operability & stability
-- [ ] **API stabilization** → `v1beta1` with validation/conversion webhooks; document compatibility.
-- [ ] **Operator HA & cleanliness** — verify leader-election failover; stop the no-op status-update
-      writes that cause a benign optimistic-concurrency conflict (skip-if-unchanged / `RetryOnConflict`).
-- [ ] **`imagePullSecrets`** — private-registry support on backend/prewarm/gateway (Xinchuang/enterprise).
-- [ ] **`SharedPVC` (RWX) cache** — node-local cache is per-node today, so each new replica
-      re-downloads weights; RWX shared cache fixes multi-node cold starts.
-- [ ] **Test depth** — no-GPU e2e harness (fake device-plugin + vLLM-stub) in CI running the full
-      `0→1→N→0` loop on every PR; soak + failure-injection (node/pod loss, GPU failure).
 - [ ] **Helm/CRD install ergonomics** — document the Helm-v4-SSA vs `kubectl apply` CRD-ownership
       conflict; smooth upgrades.
 
-### P2 — breadth & enterprise (v1 → v2)
-- [ ] **Ascend on real NPU** — validate the scaffolded backend on hardware (the headline v1 milestone);
-      HAMi/Volcano integration for sharing/gang scheduling.
-- [ ] **Model catalog** — `ModelCatalog` CRD + curated Qwen/DeepSeek/GLM presets (currently
-      `catalogRef` is unimplemented).
-- [ ] **KV-cache / TTFT-SLO autoscaling** — richer signals beyond queue depth.
-- [ ] **`BakedImage` cache** — weights baked into the image for air-gapped/small-model cases.
-- [ ] **Enterprise ops** — multi-tenant quotas, RBAC/SSO, audit, rate limiting; LoRA hot-swap;
-      canary / blue-green rollouts.
-- [ ] **Xinchuang / air-gapped bundle** — offline images + model packs, certified domestic runtimes.
-- [ ] **Security review** + docs site (bilingual).
+### P2 — production hardening (shared / exposed use)
+- [ ] **Minimal gateway auth** — static API keys on the OpenAI endpoint (explicitly *not*
+      multi-tenancy yet). Today any in-cluster caller can hit any model.
+- [ ] **Gateway HA hardening** — default is 1 replica (SPOF). Add `PodDisruptionBudget` +
+      pod anti-affinity, and **aggregate the demand signal across replicas** (KEDA currently polls a
+      single gateway's pending count, which softens activation at >1 replica).
+- [ ] **Operator HA** — verify leader-election failover.
+- [ ] **API stabilization** → `v1beta1` with validation/conversion webhooks; document compatibility.
+- [ ] **Test depth** — soak + failure-injection (node/pod loss, GPU failure) on top of the existing
+      no-GPU CI loop.
+
+### Community track (help wanted)
+- [ ] **KEDA external push scaler**
+      ([#42](https://github.com/hearth-project/hearth/issues/42)) — gRPC `StreamIsActive` push for
+      instant `0→1` activation instead of polling; removes the `demandLinger` workaround.
+
+### Demand-driven backlog (parked, not abandoned — built when a named user asks)
+- `ModelCatalog` CRD + curated Qwen/DeepSeek/GLM presets (`catalogRef` is unimplemented today).
+- KV-cache / TTFT-SLO autoscaling — richer signals beyond queue depth.
+- `BakedImage` cache; LoRA hot-swap; canary / blue-green rollouts.
+- Multi-tenant quotas, RBAC/SSO, audit, rate limiting.
+- **Xinchuang / air-gapped bundle** — offline images + model packs (lands after the P1 enablers).
+- Security review + bilingual docs site.
+
+---
+
+## Ecosystem
+
+Hearth is deliberately the **no-platform end** of the LLM-serving axis. For fleet-grade serving —
+multi-model routing, prefill/decode disaggregation, datacenter scale-out — use
+[Kthena](https://github.com/volcano-sh/kthena), [AIBrix](https://github.com/vllm-project/aibrix), or
+KServe/llm-d; they're excellent, and Hearth composes with them (hot models on the platform, the long
+tail scaled to zero with Hearth). We share operational lessons from Hearth's verified scale-to-zero
+path with Kthena's design ([kthena#1019](https://github.com/volcano-sh/kthena/issues/1019)). See the
+README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positioning.
 
 ---
 
@@ -85,7 +111,7 @@ anything requiring auth, SLAs, or stability guarantees.
 
 - **Cold start is seconds-to-minutes** — scale-to-zero is for latency-tolerant traffic; set
   `scaling.min: 1` for latency-critical models (forgoes the cost saving).
-- **Multi-node image pull dominates Nth-replica readiness** — see P0; pre-distribute images.
+- **Multi-node image pull dominates Nth-replica readiness** — see P1; pre-distribute images.
 - **Node-local cache is per-node** — replicas on fresh nodes re-download weights (until `SharedPVC`).
 - **`SharedPVC` / `BakedImage` cache strategies and `catalogRef` are not implemented.**
 - **No auth, no multi-tenancy, no quotas.**

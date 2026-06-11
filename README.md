@@ -192,7 +192,8 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
-- **v1** — Ascend running on real NPUs; HAMi/Volcano integration; curated domestic-model catalog.
+- **v1** — Ascend running on real NPUs (**310P-first**, then 910B); Volcano/HAMi live validation;
+  private-delivery enablers (`imagePullSecrets`, `pvc://`/`oci://` sources).
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today
@@ -202,7 +203,7 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 ## Contributing
 
 Hearth is early and moving fast — contributions, issues, and ideas are very welcome, especially
-**validating the Ascend backend on real NPUs** and the [roadmap](ROADMAP.md)'s P0/P1 items. Start with
+**validating the Ascend backend on real NPUs** and the [roadmap](ROADMAP.md)'s "Now"/P1 items. Start with
 **[CONTRIBUTING.md](CONTRIBUTING.md)** and please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

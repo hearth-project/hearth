@@ -42,6 +42,12 @@ type LLMServiceSpec struct {
 
 	// +optional
 	Endpoint EndpointSpec `json:"endpoint,omitempty"`
+
+	// imagePullSecrets are applied to the backend, gateway, and prewarm pods so images
+	// from private/air-gapped registries can be pulled. The secrets must exist in the
+	// LLMService's namespace.
+	// +optional
+	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
 type ModelSpec struct {

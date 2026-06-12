@@ -79,6 +79,15 @@ func servingContainer(pod corev1.PodSpec) corev1.Container {
 	return corev1.Container{}
 }
 
+func TestPrewarmJobCarriesImagePullSecrets(t *testing.T) {
+	g := NewWithT(t)
+	svc := serviceWithCache("NodeLocalPVC", true)
+	svc.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "regcred"}}
+	job, err := backend.BuildPrewarmJob(svc, runtimeFixture(), model())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(job.Spec.Template.Spec.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
+}
+
 func TestNodeLocalPVCCache(t *testing.T) {
 	g := NewWithT(t)
 	svc := serviceWithCache("NodeLocalPVC", false)

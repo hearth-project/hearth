@@ -117,6 +117,18 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 		HTTPGet: &corev1.HTTPGetAction{Path: "/healthz", Port: intstr.FromInt(gatewayPort)},
 	}}
 
+	pod := corev1.PodSpec{
+		Containers: []corev1.Container{{
+			Name:           "gateway",
+			Image:          image,
+			Env:            env,
+			Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}},
+			ReadinessProbe: probe,
+			LivenessProbe:  probe.DeepCopy(),
+		}},
+	}
+	applyImagePullSecrets(&pod, svc)
+
 	return &appsv1.Deployment{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{Name: svc.Name + "-gateway", Namespace: svc.Namespace, Labels: labels},
@@ -125,16 +137,7 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:           "gateway",
-						Image:          image,
-						Env:            env,
-						Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}},
-						ReadinessProbe: probe,
-						LivenessProbe:  probe.DeepCopy(),
-					}},
-				},
+				Spec:       pod,
 			},
 		},
 	}

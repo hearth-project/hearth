@@ -84,6 +84,7 @@ func RenderVLLMPodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infe
 	if gp := rt.Spec.Lifecycle.TerminationGracePeriodSeconds; gp != nil {
 		pod.TerminationGracePeriodSeconds = gp
 	}
+	applyImagePullSecrets(&pod, svc)
 	applyDrain(&pod, svc, rt)
 	return pod, nil
 }

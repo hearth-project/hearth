@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -46,4 +47,26 @@ func TestWholeDeviceAcceleratorRejectsFraction(t *testing.T) {
 	}
 	_, err := backend.WholeDeviceAccelerator(svc, rt)
 	g.Expect(err).To(MatchError(ContainSubstring("fraction")))
+}
+
+func TestRenderVLLMPodSpecCarriesImagePullSecrets(t *testing.T) {
+	g := NewWithT(t)
+	svc := &servingv1alpha1.LLMService{
+		ObjectMeta: metav1.ObjectMeta{Name: "qwen3-8b", Namespace: "ai"},
+		Spec: servingv1alpha1.LLMServiceSpec{
+			ImagePullSecrets: []corev1.LocalObjectReference{{Name: "regcred"}},
+		},
+	}
+	rt := &servingv1alpha1.InferenceRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "vllm-nvidia"},
+		Spec: servingv1alpha1.InferenceRuntimeSpec{
+			Container: servingv1alpha1.RuntimeContainer{
+				Image: "vllm/vllm-openai:v0.22.0",
+				Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
+			},
+		},
+	}
+	pod, err := backend.RenderVLLMPodSpec(svc, rt, backend.ResolvedModel{Path: "Qwen/Qwen3-8B"})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(pod.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
 }

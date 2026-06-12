@@ -144,6 +144,19 @@ func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infere
 		return nil, nil
 	}
 
+	pod := corev1.PodSpec{
+		RestartPolicy: corev1.RestartPolicyOnFailure,
+		Containers: []corev1.Container{{
+			Name:         "prewarm",
+			Image:        rt.Spec.Container.Image,
+			Command:      downloadCommand(m),
+			Env:          append(cacheEnv(), m.Env...),
+			VolumeMounts: []corev1.VolumeMount{*art.mount},
+		}},
+		Volumes: []corev1.Volume{*art.volume},
+	}
+	applyImagePullSecrets(&pod, svc)
+
 	backoff := int32(4)
 	return &batchv1.Job{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
@@ -152,17 +165,7 @@ func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infere
 			BackoffLimit: &backoff,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: SelectorLabels(svc)},
-				Spec: corev1.PodSpec{
-					RestartPolicy: corev1.RestartPolicyOnFailure,
-					Containers: []corev1.Container{{
-						Name:         "prewarm",
-						Image:        rt.Spec.Container.Image,
-						Command:      downloadCommand(m),
-						Env:          append(cacheEnv(), m.Env...),
-						VolumeMounts: []corev1.VolumeMount{*art.mount},
-					}},
-					Volumes: []corev1.Volume{*art.volume},
-				},
+				Spec:       pod,
 			},
 		},
 	}, nil

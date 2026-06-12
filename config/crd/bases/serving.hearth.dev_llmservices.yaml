@@ -109,9 +109,34 @@ spec:
                       OpenAI-compatible API. Reserved for future protocol selection.
                     type: boolean
                 type: object
+              imagePullSecrets:
+                description: |-
+                  imagePullSecrets are applied to the backend, gateway, and prewarm pods so images
+                  from private/air-gapped registries can be pulled. The secrets must exist in the
+                  LLMService's namespace.
+                items:
+                  description: |-
+                    LocalObjectReference contains enough information to let you locate the
+                    referenced object inside the same namespace.
+                  properties:
+                    name:
+                      default: ""
+                      description: |-
+                        Name of the referent.
+                        This field is effectively required, but due to backwards compatibility is
+                        allowed to be empty. Instances of this type with an empty value here are
+                        almost certainly wrong.
+                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      type: string
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
               model:
                 properties:
                   catalogRef:
+                    description: |-
+                      catalogRef points to an external model catalog entry. Catalog resolution
+                      is currently not implemented in v0; use model.source.uri for now.
                     type: string
                   source:
                     properties:
@@ -132,8 +157,9 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       uri:
-                        description: 'uri is the model location: hf:// | modelscope://
-                          | oci:// | s3:// | pvc://'
+                        description: |-
+                          uri is the model location. Supported in v0: hf://, modelscope://.
+                          oci://, s3://, and pvc:// are currently tracked as not yet implemented.
                         type: string
                     required:
                     - uri

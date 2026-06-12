@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
@@ -41,6 +42,14 @@ func TestGatewayReplicasDefaultAndOverride(t *testing.T) {
 	// an explicit value is respected (HA opt-in)
 	dep = backend.BuildGatewayDeployment(gatewaySvc(), "img", 3)
 	g.Expect(*dep.Spec.Replicas).To(Equal(int32(3)))
+}
+
+func TestGatewayCarriesImagePullSecrets(t *testing.T) {
+	g := NewWithT(t)
+	svc := gatewaySvc()
+	svc.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "regcred"}}
+	dep := backend.BuildGatewayDeployment(svc, "img", 1)
+	g.Expect(dep.Spec.Template.Spec.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
 }
 
 func TestGatewayPointsAtBackendService(t *testing.T) {

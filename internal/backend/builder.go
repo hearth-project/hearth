@@ -96,6 +96,13 @@ func BuildDeployment(a BackendAdapter, svc *servingv1alpha1.LLMService, rt *serv
 	return dep, nil
 }
 
+// applyImagePullSecrets sets the LLMService's pull secrets on a rendered pod so private /
+// air-gapped backend, gateway, and prewarm images can be pulled. Secrets are namespaced,
+// which is why this lives on the namespaced LLMService rather than the cluster-scoped runtime.
+func applyImagePullSecrets(pod *corev1.PodSpec, svc *servingv1alpha1.LLMService) {
+	pod.ImagePullSecrets = append(pod.ImagePullSecrets, svc.Spec.ImagePullSecrets...)
+}
+
 // applyAccelerator merges the accelerator request into the serving container and pod.
 // Extended (device-plugin) resources are set as limits only; Kubernetes mirrors them
 // into requests automatically.

@@ -51,6 +51,8 @@ shown below when a default is defined.
 | `spec.endpoint.coldStart` | object | - | Behavior for requests received while the backend is scaled to zero or still loading. |
 | `spec.endpoint.coldStart.mode` | string | default `keepalive`; enum `keepalive`, `reject` | `keepalive` holds streaming requests open with SSE heartbeats; `reject` returns fast `503 + Retry-After`. |
 | `spec.endpoint.coldStart.heartbeatInterval` | duration string | `10s` | Interval between keepalive heartbeats while a cold streaming request is waiting. |
+| `spec.imagePullSecrets` | object array | - | `LocalObjectReference`s applied to the backend, gateway, and prewarm pods so images from private / air-gapped registries can be pulled. The named Secrets must exist in the LLMService's namespace. |
+| `spec.imagePullSecrets[].name` | string | `""` | Name of an image-pull Secret in the LLMService's namespace. |
 
 Kubernetes quantity fields accept standard resource quantity strings such as `8`, `500m`, `32Gi`,
 or `60Gi`. Duration fields use Go/Kubernetes duration strings such as `10s`, `2m`, or `5m`.

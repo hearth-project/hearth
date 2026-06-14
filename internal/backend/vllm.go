@@ -18,6 +18,7 @@ package backend
 
 import (
 	"fmt"
+	"path"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,7 +27,12 @@ import (
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 )
 
-const sharedMemoryVolume = "dshm"
+const (
+	sharedMemoryVolume = "dshm"
+	modelStoreVolume   = "model-store"
+	// ModelPVCMountPath is where a pvc:// model store is mounted in the serving pod.
+	ModelPVCMountPath = "/models"
+)
 
 // RenderVLLMPodSpec builds the vendor-neutral vLLM serving pod: one container with
 // templated args/env, the runtime's model-load-aware probes, CPU/memory from the
@@ -34,8 +40,14 @@ const sharedMemoryVolume = "dshm"
 // resources and scheduling are layered on by BuildDeployment via the adapter's
 // Accelerator. Vendor adapters call this and add only their vendor-specific extras.
 func RenderVLLMPodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime, m ResolvedModel) (corev1.PodSpec, error) {
+	// For a pvc:// model the weights live on a mounted PVC, so --model is a local path
+	// (mount + subpath) rather than a repo id.
+	modelPath := m.Path
+	if m.PVC != "" {
+		modelPath = path.Join(ModelPVCMountPath, m.Path)
+	}
 	data := TemplateData{
-		Model:   ModelData{Path: m.Path},
+		Model:   ModelData{Path: modelPath},
 		Service: ServiceData{Name: svc.Name, Namespace: svc.Namespace},
 	}
 
@@ -84,6 +96,9 @@ func RenderVLLMPodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infe
 	if gp := rt.Spec.Lifecycle.TerminationGracePeriodSeconds; gp != nil {
 		pod.TerminationGracePeriodSeconds = gp
 	}
+	if m.PVC != "" {
+		mountModelStore(&pod, m.PVC)
+	}
 	applyImagePullSecrets(&pod, svc)
 	applyDrain(&pod, svc, rt)
 	return pod, nil
@@ -114,6 +129,25 @@ func applyDrain(pod *corev1.PodSpec, svc *servingv1alpha1.LLMService, rt *servin
 	grace := secs + 10
 	if pod.TerminationGracePeriodSeconds == nil || *pod.TerminationGracePeriodSeconds < grace {
 		pod.TerminationGracePeriodSeconds = &grace
+	}
+}
+
+// mountModelStore mounts an existing PVC (pvc:// source) read-only at ModelPVCMountPath
+// on the serving container, so vLLM loads pre-staged weights with no download.
+func mountModelStore(pod *corev1.PodSpec, pvcName string) {
+	pod.Volumes = append(pod.Volumes, corev1.Volume{
+		Name: modelStoreVolume,
+		VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: pvcName, ReadOnly: true,
+		}},
+	})
+	for i := range pod.Containers {
+		if pod.Containers[i].Name != ServingContainerName {
+			continue
+		}
+		pod.Containers[i].VolumeMounts = append(pod.Containers[i].VolumeMounts, corev1.VolumeMount{
+			Name: modelStoreVolume, MountPath: ModelPVCMountPath, ReadOnly: true,
+		})
 	}
 }
 

@@ -88,6 +88,14 @@ func TestPrewarmJobCarriesImagePullSecrets(t *testing.T) {
 	g.Expect(job.Spec.Template.Spec.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
 }
 
+func TestPrewarmJobSkippedForPVCSource(t *testing.T) {
+	g := NewWithT(t)
+	svc := serviceWithCache("NodeLocalPVC", true)
+	job, err := backend.BuildPrewarmJob(svc, runtimeFixture(), backend.ResolvedModel{Source: "pvc", PVC: "model-store", Path: "m"})
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(job).To(BeNil()) // weights are pre-staged on the PVC; nothing to download
+}
+
 func TestNodeLocalPVCCache(t *testing.T) {
 	g := NewWithT(t)
 	svc := serviceWithCache("NodeLocalPVC", false)

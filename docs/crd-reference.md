@@ -18,7 +18,7 @@ shown below when a default is defined.
 | `spec.model` | object | required | Model identity and source. |
 | `spec.model.catalogRef` | string | - | Optional catalog entry name for a model resolved outside the inline source block. 🚧 **Not yet implemented in v0** — use `spec.model.source.uri` instead. See [#33](https://github.com/hearth-project/hearth/issues/33). |
 | `spec.model.source` | object | - | Inline model source configuration. |
-| `spec.model.source.uri` | string | required when `source` is set | Model location. Supported in v0: `hf://`, `modelscope://`. `oci://`, `s3://`, and `pvc://` are currently not implemented yet. See [#36](https://github.com/hearth-project/hearth/issues/36). |
+| `spec.model.source.uri` | string | required when `source` is set | Model location. Supported in v0: `hf://`, `modelscope://`, and `pvc://<claim>[/<subpath>]` (weights pre-staged on an existing PVC, mounted read-only at `/models` — no download; pair with `cache.strategy: None`). `oci://` and `s3://` are not implemented yet. See [#36](https://github.com/hearth-project/hearth/issues/36). |
 | `spec.model.source.secretRef` | object | - | Credentials for private model sources, represented as a Kubernetes `LocalObjectReference`. |
 | `spec.model.source.secretRef.name` | string | `""` | Name of the Secret holding source credentials. |
 | `spec.runtime` | object | - | Backend runtime selection. Pin a runtime by name or provide a vendor preference selector. |

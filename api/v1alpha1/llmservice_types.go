@@ -61,8 +61,9 @@ type ModelSpec struct {
 }
 
 type ModelSource struct {
-	// uri is the model location. Supported in v0: hf://, modelscope://.
-	// oci://, s3://, and pvc:// are currently tracked as not yet implemented.
+	// uri is the model location. Supported in v0: hf://, modelscope://, and
+	// pvc://<claim>[/<subpath>] (pre-staged weights on an existing PVC, mounted
+	// read-only). oci:// and s3:// are not yet implemented.
 	URI string `json:"uri"`
 
 	// secretRef holds credentials for private sources (e.g. a ModelScope token).

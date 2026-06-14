@@ -70,3 +70,43 @@ func TestRenderVLLMPodSpecCarriesImagePullSecrets(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(pod.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
 }
+
+func TestRenderVLLMPodSpecMountsModelPVC(t *testing.T) {
+	g := NewWithT(t)
+	svc := &servingv1alpha1.LLMService{ObjectMeta: metav1.ObjectMeta{Name: "qwen3-8b", Namespace: "ai"}}
+	rt := &servingv1alpha1.InferenceRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "vllm-nvidia"},
+		Spec: servingv1alpha1.InferenceRuntimeSpec{
+			Container: servingv1alpha1.RuntimeContainer{
+				Image: "vllm/vllm-openai:v0.22.0",
+				Args:  []string{"--model={{ .Model.Path }}"},
+				Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
+			},
+		},
+	}
+	pod, err := backend.RenderVLLMPodSpec(svc, rt, backend.ResolvedModel{Source: "pvc", PVC: "model-store", Path: "Qwen3-8B"})
+	g.Expect(err).NotTo(HaveOccurred())
+
+	c := pod.Containers[0]
+	// --model points at the path inside the mounted PVC
+	g.Expect(c.Args).To(ContainElement("--model=/models/Qwen3-8B"))
+
+	// the serving container mounts the model store read-only
+	var mounted bool
+	for _, vm := range c.VolumeMounts {
+		if vm.MountPath == "/models" {
+			mounted = true
+			g.Expect(vm.ReadOnly).To(BeTrue())
+		}
+	}
+	g.Expect(mounted).To(BeTrue())
+
+	// the volume references the user's existing PVC
+	var claim string
+	for _, v := range pod.Volumes {
+		if v.PersistentVolumeClaim != nil {
+			claim = v.PersistentVolumeClaim.ClaimName
+		}
+	}
+	g.Expect(claim).To(Equal("model-store"))
+}

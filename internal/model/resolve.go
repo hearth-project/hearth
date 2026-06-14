@@ -56,7 +56,14 @@ func Resolve(model servingv1alpha1.ModelSpec) (backend.ResolvedModel, error) {
 			Source: "modelscope",
 			Env:    []corev1.EnvVar{{Name: "VLLM_USE_MODELSCOPE", Value: "true"}},
 		}, nil
+	case "pvc":
+		// pvc://<claim>/<subpath>: weights pre-staged on an existing PVC (air-gapped).
+		pvcName, subpath, _ := strings.Cut(ref, "/")
+		if pvcName == "" {
+			return backend.ResolvedModel{}, fmt.Errorf("invalid pvc uri %q: expected pvc://<claim>[/<subpath>]", model.Source.URI)
+		}
+		return backend.ResolvedModel{Path: subpath, Source: "pvc", PVC: pvcName}, nil
 	default:
-		return backend.ResolvedModel{}, fmt.Errorf("model uri scheme %q is not supported yet (use hf:// or modelscope://)", scheme)
+		return backend.ResolvedModel{}, fmt.Errorf("model uri scheme %q is not supported yet (use hf://, modelscope://, or pvc://)", scheme)
 	}
 }

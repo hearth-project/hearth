@@ -46,6 +46,24 @@ func TestResolveHuggingFace(t *testing.T) {
 	g.Expect(got.Env).To(BeEmpty())
 }
 
+func TestResolvePVC(t *testing.T) {
+	g := NewWithT(t)
+	got, err := model.Resolve(src("pvc://model-store/Qwen3-8B-Instruct"))
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(got.Source).To(Equal("pvc"))
+	g.Expect(got.PVC).To(Equal("model-store"))
+	g.Expect(got.Path).To(Equal("Qwen3-8B-Instruct"))
+	g.Expect(got.Env).To(BeEmpty())
+}
+
+func TestResolvePVCWholeVolume(t *testing.T) {
+	g := NewWithT(t)
+	got, err := model.Resolve(src("pvc://model-store"))
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(got.PVC).To(Equal("model-store"))
+	g.Expect(got.Path).To(Equal(""))
+}
+
 func TestResolveErrors(t *testing.T) {
 	g := NewWithT(t)
 
@@ -56,6 +74,9 @@ func TestResolveErrors(t *testing.T) {
 	g.Expect(err).To(HaveOccurred())
 
 	_, err = model.Resolve(src("s3://bucket/model"))
+	g.Expect(err).To(HaveOccurred())
+
+	_, err = model.Resolve(src("pvc:///model")) // empty PVC name
 	g.Expect(err).To(HaveOccurred())
 
 	_, err = model.Resolve(servingv1alpha1.ModelSpec{CatalogRef: "qwen3-8b-instruct"})

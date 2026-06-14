@@ -31,9 +31,13 @@ import (
 
 type ResolvedModel struct {
 	Path string
-	// Source ("hf" | "modelscope") selects the prewarm download command.
+	// Source ("hf" | "modelscope" | "pvc") selects the prewarm download command, or
+	// "pvc" for weights pre-staged on a PersistentVolumeClaim (no download).
 	Source string
 	Env    []corev1.EnvVar
+	// PVC, when set (pvc:// source), is an existing claim mounted read-only at the model
+	// mount path; Path is then the model's subpath within that PVC. No prewarm is run.
+	PVC string
 }
 
 type AcceleratorRequest struct {

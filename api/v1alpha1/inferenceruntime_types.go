@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // InferenceRuntimeSpec defines a pluggable inference backend (e.g. NVIDIA-vLLM,
@@ -197,5 +198,8 @@ type InferenceRuntimeList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&InferenceRuntime{}, &InferenceRuntimeList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(SchemeGroupVersion, &InferenceRuntime{}, &InferenceRuntimeList{})
+		return nil
+	})
 }

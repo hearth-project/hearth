@@ -43,7 +43,7 @@ func BuildServiceMonitor(svc *servingv1alpha1.LLMService) *unstructured.Unstruct
 			"matchLabels": map[string]any{llmServiceLabel: svc.Name},
 		},
 		"endpoints": []any{
-			map[string]any{"port": "http", "path": "/metrics", "interval": "15s"},
+			map[string]any{"port": portNameHTTP, "path": "/metrics", "interval": "15s"},
 		},
 	}
 	return obj

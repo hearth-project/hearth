@@ -1,5 +1,5 @@
 # Build the vllm-stub binary (a CPU fake of a vLLM OpenAI server, for no-GPU e2e tests)
-FROM golang:1.25 AS builder
+FROM golang:1.26 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 

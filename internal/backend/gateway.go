@@ -36,6 +36,7 @@ const (
 	defaultGatewayReplicas = 1
 	gatewayLabel           = "serving.hearth.dev/gateway"
 	backendSvcSuffix       = "-backend"
+	portNameHTTP           = "http"
 )
 
 func BackendServiceName(svc *servingv1alpha1.LLMService) string {
@@ -67,7 +68,7 @@ func BuildBackendService(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.In
 		Spec: corev1.ServiceSpec{
 			Selector: SelectorLabels(svc),
 			Ports: []corev1.ServicePort{{
-				Name:       "http",
+				Name:       portNameHTTP,
 				Port:       80,
 				TargetPort: intstr.FromString(rt.Spec.Container.Port.Name),
 				Protocol:   corev1.ProtocolTCP,
@@ -83,7 +84,7 @@ func BuildGatewayService(svc *servingv1alpha1.LLMService) *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Selector: gatewaySelectorLabels(svc),
 			Ports: []corev1.ServicePort{{
-				Name:       "http",
+				Name:       portNameHTTP,
 				Port:       80,
 				TargetPort: intstr.FromInt(gatewayPort),
 				Protocol:   corev1.ProtocolTCP,
@@ -122,7 +123,7 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 			Name:           "gateway",
 			Image:          image,
 			Env:            env,
-			Ports:          []corev1.ContainerPort{{Name: "http", ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}},
+			Ports:          []corev1.ContainerPort{{Name: portNameHTTP, ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}},
 			ReadinessProbe: probe,
 			LivenessProbe:  probe.DeepCopy(),
 		}},

@@ -35,7 +35,7 @@ large change.
 
 ## Development setup
 
-**Prerequisites:** Go **1.25+**, `make`, Docker or Podman (`CONTAINER_TOOL`), `kubectl`, `helm`, and
+**Prerequisites:** Go **1.26+**, `make`, Docker or Podman (`CONTAINER_TOOL`), `kubectl`, `helm`, and
 [`kind`](https://kind.sigs.k8s.io/) for local clusters. Scale-to-zero needs **KEDA** in the cluster.
 
 ```bash

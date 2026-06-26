@@ -1,0 +1,59 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: vllm-musa
+# Moore Threads (MUSA) GPUs, e.g. MTT S4000 48GB, running vLLM-MUSA.
+# Requires the MT Container Toolkit (driver injection) + the Moore Threads device plugin
+# or HAMi on the nodes.
+spec:
+  family: vllm
+  vendor: moorethreads
+  priority: 100
+  container:
+    # TODO: confirm the exact published image/tag from github.com/MooreThreads/vllm-musa
+    # (vendor registry). vLLM-MUSA serves the OpenAI API the same as upstream vLLM.
+    image: mthreads/vllm-musa:v0.22.0
+    args:
+      - --model={{ .Model.Path }}
+      - --served-model-name={{ .Service.Name }}
+      - --port=8000
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    # whole-card allocation via HAMi / the Moore Threads device plugin; visibility is set
+    # by the plugin, Hearth only requests the resource. See HAMi mthreads-support.md.
+    resourceName: mthreads.com/vgpu
+    sharing:
+      supported: false
+    nodeSelector:
+      accelerator: mtt-s4000
+  health:
+    readiness:
+      httpGet:
+        path: /health
+        port: http
+    liveness:
+      httpGet:
+        path: /health
+        port: http
+      failureThreshold: 6
+    startup:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+      failureThreshold: 180
+  lifecycle:
+    terminationGracePeriodSeconds: 120
+    preStopDrain: true
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:gpu_cache_usage_perc
+    running: vllm:num_requests_running
+    ttft: vllm:time_to_first_token_seconds

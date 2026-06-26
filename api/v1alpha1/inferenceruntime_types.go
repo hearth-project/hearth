@@ -29,7 +29,7 @@ type InferenceRuntimeSpec struct {
 	// +kubebuilder:default=vllm
 	Family string `json:"family"`
 
-	// +kubebuilder:validation:Enum=nvidia;ascend;cambricon;hygon
+	// +kubebuilder:validation:Enum=nvidia;ascend;cambricon;hygon;moorethreads
 	Vendor string `json:"vendor"`
 
 	// priority breaks ties when several runtimes match an LLMService selector (higher wins).

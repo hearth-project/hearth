@@ -45,12 +45,15 @@ anything requiring auth, SLAs, or stability guarantees.
 
 ## Path to production
 
-### Now — the v1 milestone: Ascend on real NPUs (310P-first)
-- [ ] **Validate the Ascend backend on real hardware.** Cheapest credible path first: **Ascend 310P**
-      (Atlas 300I Pro/Duo) — vllm-ascend ships dedicated `-310p` images and a runtime sample is
-      already in-repo (`config/samples/serving_v1alpha1_inferenceruntime_ascend_310p.yaml`).
-      Deliverables: a bring-up runbook, cold-start numbers, and the honest claim *"functionally
-      validated on 310P"*. **910B** follows for performance claims.
+### Now — the v1 milestone: a domestic backend on real hardware
+- [ ] **Validate a domestic backend on real hardware.** Current path: **Moore Threads (MUSA)** on
+      **MTT S5000 80GB** — the `moorethreads` adapter + `vllm-musa` runtime sample
+      (`config/samples/serving_v1alpha1_inferenceruntime_moorethreads.yaml`) are in-repo and
+      golden-tested. Bring-up follows the contract checklist: confirm the published image, the
+      `/metrics` field names, `/health` load-gating, and the device-plugin resource. Deliverables: a
+      bring-up runbook, cold-start numbers, and the honest claim *"validated end-to-end on real
+      domestic silicon (MTT S5000)"*. The **Ascend** backend stays scaffolded + golden-tested pending
+      NPU hardware.
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
       is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi
       sharing / gang scheduling follows.

@@ -46,7 +46,7 @@ func TestPickByVendorPreferenceOrderBeatsPriority(t *testing.T) {
 func TestPickByVendorPriorityTieBreak(t *testing.T) {
 	g := NewWithT(t)
 	items := []servingv1alpha1.InferenceRuntime{
-		rt("vllm-ascend-310p", "ascend", 90),
+		rt("vllm-ascend-alt", "ascend", 90),
 		rt("vllm-ascend", "ascend", 100),
 	}
 	got, err := pickByVendor(items, []string{"ascend"})

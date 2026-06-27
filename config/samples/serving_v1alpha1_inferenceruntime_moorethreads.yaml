@@ -5,7 +5,7 @@ metadata:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
   name: vllm-musa
-# Moore Threads (MUSA) GPUs, e.g. MTT S4000 48GB, running vLLM-MUSA.
+# Moore Threads (MUSA) GPUs, e.g. MTT S5000 80GB, running vLLM-MUSA.
 # Requires the MT Container Toolkit (driver injection) + the Moore Threads device plugin
 # or HAMi on the nodes.
 spec:
@@ -30,7 +30,7 @@ spec:
     sharing:
       supported: false
     nodeSelector:
-      accelerator: mtt-s4000
+      accelerator: mtt-s5000
   health:
     readiness:
       httpGet:

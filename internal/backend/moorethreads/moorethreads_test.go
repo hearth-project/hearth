@@ -41,7 +41,7 @@ func musaRuntime() *servingv1alpha1.InferenceRuntime {
 			},
 			Accelerator: servingv1alpha1.AcceleratorSpec{
 				ResourceName: "mthreads.com/vgpu",
-				NodeSelector: map[string]string{"accelerator": "mtt-s4000"},
+				NodeSelector: map[string]string{"accelerator": "mtt-s5000"},
 			},
 		},
 	}
@@ -74,7 +74,7 @@ func TestSameFrameworkRendersMooreThreads(t *testing.T) {
 
 	// the MUSA resource comes from the runtime, not adapter code
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceName("mthreads.com/vgpu")))
-	g.Expect(dep.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "mtt-s4000"))
+	g.Expect(dep.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "mtt-s5000"))
 }
 
 // TestNoHostDriverMounts confirms the MUSA adapter relies on the MT Container Toolkit /

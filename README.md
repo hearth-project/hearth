@@ -192,8 +192,9 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
-- **v1** — Ascend running on real NPUs (**310P-first**, then 910B); Volcano/HAMi live validation;
-  private-delivery enablers (`imagePullSecrets`, `pvc://`/`oci://` sources).
+- **v1** — domestic backends on real hardware: **Moore Threads (MUSA, MTT S5000)** first, Ascend NPUs
+  to follow; Volcano/HAMi live validation; private-delivery enablers (`imagePullSecrets`,
+  `pvc://`/`oci://` sources).
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today

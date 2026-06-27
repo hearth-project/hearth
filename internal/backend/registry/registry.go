@@ -26,7 +26,7 @@ import (
 )
 
 // New returns the default registry. v0 fully implements nvidia and scaffolds ascend +
-// moorethreads (golden-tested; moorethreads validated on real MTT S4000 hardware, ascend
+// moorethreads (golden-tested; moorethreads validated on real MTT S5000 hardware, ascend
 // on real NPUs in v1); the mlu adapter lands later.
 func New() *backend.Registry {
 	r := backend.NewRegistry()

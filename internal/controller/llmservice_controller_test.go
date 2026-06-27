@@ -140,7 +140,7 @@ var _ = Describe("LLMService Controller", func() {
 					Vendor:   "ascend",
 					Priority: 100,
 					Container: servingv1alpha1.RuntimeContainer{
-						Image: "quay.io/ascend/vllm-ascend:v0.18.0",
+						Image: "quay.io/ascend/vllm-ascend:v0.21.0rc1",
 						Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
 					},
 					Accelerator: servingv1alpha1.AcceleratorSpec{ResourceName: "huawei.com/Ascend910"},

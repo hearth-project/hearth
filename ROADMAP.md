@@ -27,8 +27,10 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
 - **Graceful drain** — in-flight streams finish before a scale-down SIGTERM.
 - **Observability** — Prometheus scrapes gateway + vLLM `/metrics` via `ServiceMonitor`.
 - **Packaging** — Helm chart installs operator + RBAC; verified reconciling under chart RBAC.
-- **Multi-backend abstraction** — NVIDIA implemented & run; **Ascend** scaffolded + golden-tested
-  (renders correct manifests) but **not yet run on real NPUs**.
+- **Multi-backend abstraction** — NVIDIA implemented & run; **Ascend 910B** is an experimental
+  preview: vLLM-Ascend serves on a real 910B, manifests render correctly, and the gateway data-plane
+  is verified on the NPU — only the device-plugin scheduling e2e is pending
+  (see [Ascend 910B validation](docs/ascend-910b-validation.md)).
 - **No-GPU CI loop** — the full `0→1→N→0` scale-to-zero e2e (CPU `vllm-stub` + a fake extended
   resource on kind) runs in CI; contributing needs no accelerator.
 
@@ -46,14 +48,19 @@ anything requiring auth, SLAs, or stability guarantees.
 ## Path to production
 
 ### Now — the v1 milestone: a domestic backend on real hardware
-- [ ] **Validate a domestic backend on real hardware.** Current path: **Moore Threads (MUSA)** on
-      **MTT S5000 80GB** — the `moorethreads` adapter + `vllm-musa` runtime sample
-      (`config/samples/serving_v1alpha1_inferenceruntime_moorethreads.yaml`) are in-repo and
-      golden-tested. Bring-up follows the contract checklist: confirm the published image, the
-      `/metrics` field names, `/health` load-gating, and the device-plugin resource. Deliverables: a
-      bring-up runbook, cold-start numbers, and the honest claim *"validated end-to-end on real
-      domestic silicon (MTT S5000)"*. The **Ascend** backend stays scaffolded + golden-tested pending
-      NPU hardware.
+- **Validate a domestic backend on real hardware.** Target: **Ascend 910B 64GB**. Status as of
+      `v0.2.0-rc.1` (see [Ascend 910B validation](docs/ascend-910b-validation.md)):
+  - [x] vLLM-Ascend serves on a real 910B (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
+  - [x] Operator renders correct 910B manifests (`huawei.com/Ascend910`, driver mounts, cache, probes).
+  - [x] Gateway data-plane verified on the NPU (queue signal, passthrough, cold-start keepalive).
+  - [x] Runtime image pinned to the verified tag (`vllm-ascend:v0.21.0rc1`).
+  - [ ] **Operator → device plugin → pod scheduled and serving on the NPU**, and the full integrated
+        `0→1→N→0` loop on a real NPU node — needs a schedulable node (the preview box was an
+        unprivileged container, so nested k8s couldn't run). Closing this earns the claim
+        *"validated end-to-end on real domestic silicon (Ascend 910B)"*.
+
+      The **Moore Threads (MUSA)** backend (`moorethreads` + `vllm-musa`, MTT S5000) is in-repo,
+      scaffolded + golden-tested, ready as the second backend.
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
       is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi
       sharing / gang scheduling follows.
@@ -118,5 +125,7 @@ README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positio
 - **Node-local cache is per-node** — replicas on fresh nodes re-download weights (until `SharedPVC`).
 - **`SharedPVC` / `BakedImage` cache strategies and `catalogRef` are not implemented.**
 - **No auth, no multi-tenancy, no quotas.**
-- **Ascend/MLU are manifest-only** (golden-tested), not run on hardware.
+- **Ascend 910B is an experimental preview** — vLLM-Ascend serving, manifest render, and the gateway
+  data-plane are verified on a real 910B, but the operator scheduling a pod onto the NPU (device plugin)
+  and the full integrated `0→1→N→0` loop are **not yet run on hardware**. **MLU is manifest-only.**
 - **`v1alpha1`** — breaking API changes expected before `v1beta1`.

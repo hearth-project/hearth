@@ -5,13 +5,14 @@ metadata:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
   name: vllm-ascend
-# v0: golden-tested only; validated on real Ascend NPUs in v1.
+# Ascend 910B (Atlas A2). Image pinned to the vllm-ascend release verified on a real
+# 910B2C (CANN 9.0.0 / driver 26.0.rc1). For A3 use the -a3 tag, for 310P the -310p tag.
 spec:
   family: vllm
   vendor: ascend
   priority: 100
   container:
-    image: quay.io/ascend/vllm-ascend:v0.18.0
+    image: quay.io/ascend/vllm-ascend:v0.21.0rc1
     args:
       - --model={{ .Model.Path }}
       - --served-model-name={{ .Service.Name }}

@@ -16,9 +16,10 @@ limitations under the License.
 
 // Package ascend is the backend adapter for Huawei Ascend NPUs running vLLM-Ascend.
 //
-// v0 status: the adapter renders correct, golden-tested manifests but is NOT validated
-// on real NPUs yet (no hardware) — that is the v1 milestone. It does only K8s-layer
-// adaptation (resource request + driver projection); chip kernels belong to vLLM-Ascend.
+// Status (v0.2.0-rc.1): experimental preview. vLLM-Ascend has been run on a real 910B and the
+// rendered manifests confirmed correct for it; the device-plugin scheduling e2e is still pending
+// (the v1 "supported" milestone). The adapter does only K8s-layer adaptation (resource request +
+// driver projection); chip kernels belong to vLLM-Ascend.
 package ascend
 
 import (
@@ -32,8 +33,8 @@ const Vendor = "ascend"
 
 // hostDriverMounts are the standard Huawei CANN/driver paths the vLLM-Ascend container
 // needs when the host driver is used directly. Drop these when the cluster runs the
-// ascend-docker-runtime, which injects them automatically. Paths are validated against
-// real NPUs in v1.
+// ascend-docker-runtime, which injects them automatically. These paths were confirmed present
+// on a real 910B (CANN 9.0.0 / driver 26.0.rc1).
 var hostDriverMounts = []backend.HostMount{
 	{Name: "ascend-driver", Path: "/usr/local/Ascend/driver"},
 	{Name: "npu-smi", Path: "/usr/local/bin/npu-smi"},

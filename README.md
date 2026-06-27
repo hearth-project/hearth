@@ -20,11 +20,14 @@ into a single `LLMService` manifest: declarative deploy, queue-driven autoscalin
 **scale-to-zero** — with NVIDIA-vLLM / vLLM-Ascend (Cambricon planned) as **pluggable backends**
 behind one API, and nothing else to adopt.
 
-> **Status — `v0.1.0` (alpha).** The NVIDIA backend and the full scale-to-zero path
+> **Status — `v0.2.0-rc.1` (alpha).** The NVIDIA backend and the full scale-to-zero path
 > (gateway + KEDA) are **implemented and verified end-to-end on real NVIDIA GPUs** — cold-start
 > keepalive, graceful drain, model caching/prewarm, 1→N autoscaling, and observability. The
-> **Ascend** backend is scaffolded and golden-tested (renders correct manifests) but **not yet
-> validated on real NPUs** — the v1 milestone (pending hardware). Still `v1alpha1` and **not
+> **Ascend 910B** backend is now an **experimental / technical preview**: on a real 910B we've
+> verified vLLM-Ascend serves on the NPU, the operator renders correct 910B manifests, and the
+> gateway data-plane works — but the operator scheduling a pod onto an NPU via the device plugin
+> (full integrated scale-to-zero e2e) is **not yet verified** (needs a schedulable NPU node). See the
+> [Ascend 910B validation report](docs/ascend-910b-validation.md). Still `v1alpha1` and **not
 > production-ready** (no auth, no multi-tenancy) — see the **[roadmap](ROADMAP.md)**. ⭐ and follow along.
 
 ## Why Hearth
@@ -126,7 +129,7 @@ resource, probes, metrics). Adapter **code** is thin because the differences are
 | Backend | Engine | Accelerator | v0 status |
 |---|---|---|---|
 | `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
-| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 scaffolded + golden-tested (HW validation in v1) |
+| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 experimental preview — serves on real 910B; render + gateway verified; full scheduling e2e pending ([report](docs/ascend-910b-validation.md)) |
 | `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
 
 Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).
@@ -192,9 +195,12 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
-- **v1** — domestic backends on real hardware: **Moore Threads (MUSA, MTT S5000)** first, Ascend NPUs
-  to follow; Volcano/HAMi live validation; private-delivery enablers (`imagePullSecrets`,
-  `pvc://`/`oci://` sources).
+- **`v0.2.0-rc.1` (pre-release)** — **Ascend 910B experimental preview**: vLLM-Ascend serving verified
+  on real 910B silicon, operator manifests confirmed correct, gateway data-plane verified on the NPU
+  ([report](docs/ascend-910b-validation.md)). Device-plugin scheduling e2e still pending.
+- **v1** — domestic backends fully on real hardware: **Ascend 910B** first (close out the scheduling
+  e2e), Moore Threads (MUSA, MTT S5000) scaffolded behind it; Volcano/HAMi live validation;
+  private-delivery enablers (`imagePullSecrets`, `pvc://`/`oci://` sources).
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today

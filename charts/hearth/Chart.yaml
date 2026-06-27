@@ -2,8 +2,8 @@ apiVersion: v2
 name: hearth
 description: Scale-to-zero serving for open-source LLMs on Kubernetes — one CRD + KEDA, no platform to adopt. Vendor-neutral across NVIDIA, Ascend, and more.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0-rc.1
+appVersion: "0.2.0-rc.1"
 kubeVersion: ">=1.29.0-0"
 keywords:
   - llm

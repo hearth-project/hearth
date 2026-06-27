@@ -35,7 +35,7 @@ func ascendRuntime() *servingv1alpha1.InferenceRuntime {
 			Family: "vllm",
 			Vendor: "ascend",
 			Container: servingv1alpha1.RuntimeContainer{
-				Image: "quay.io/ascend/vllm-ascend:v0.18.0",
+				Image: "quay.io/ascend/vllm-ascend:v0.21.0rc1",
 				Args:  []string{"--model={{ .Model.Path }}", "--served-model-name={{ .Service.Name }}"},
 				Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
 			},
@@ -69,7 +69,7 @@ func TestSameFrameworkRendersAscend(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	c := dep.Spec.Template.Spec.Containers[0]
-	g.Expect(c.Image).To(Equal("quay.io/ascend/vllm-ascend:v0.18.0"))
+	g.Expect(c.Image).To(Equal("quay.io/ascend/vllm-ascend:v0.21.0rc1"))
 	g.Expect(c.Args).To(ContainElement("--model=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"))
 
 	// the NPU resource comes from the runtime, not adapter code

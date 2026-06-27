@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-06-27
+
+Pre-release documenting the first **real-hardware bring-up of the Ascend 910B backend**. vLLM-Ascend
+now serves on a physical 910B, the operator's rendered manifests are confirmed correct for the 910
+family, and the gateway data-plane is verified against the live NPU. The remaining gap — the operator
+scheduling a backend pod onto an NPU via the device plugin (full integrated scale-to-zero e2e) — needs
+a schedulable NPU node and stays open. Ascend support is therefore **experimental / technical preview**,
+not yet "supported." Still `v1alpha1` and not production-ready.
+
+### Added
+- **Ascend 910B validation report + bring-up runbook** ([docs/ascend-910b-validation.md](docs/ascend-910b-validation.md))
+  capturing the verified environment (910B2C 64 GB, CANN 9.0.0 / driver 26.0.rc1), the smoke test,
+  the operator render dry-run, and the gateway data-plane results.
+
+### Changed
+- **Ascend runtime image** pinned to `quay.io/ascend/vllm-ascend:v0.21.0rc1` (was `v0.18.0`) — the
+  base Atlas-A2/910B tag, matching the `vllm_ascend 0.21.0rc1` stack verified on real hardware.
+- **Ascend status** updated from "scaffolded, not run on hardware" to **experimental / technical
+  preview** across README, ROADMAP, and the adapter docs, reflecting what is now verified on a real
+  910B (vLLM-Ascend serves; manifests render correctly; gateway data-plane works) versus what is not
+  (device-plugin scheduling + full integrated e2e).
+
+### Verified (Ascend 910B, real hardware)
+- **vLLM-Ascend serves on the NPU** — Qwen2.5 loaded onto a 910B2C and answered via the OpenAI API
+  (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
+- **Operator renders a correct 910B backend** (kind dry-run) — `huawei.com/Ascend910` request, CANN
+  driver host-mounts, ModelScope cache wiring, load-gated probes; vendor selector resolves to `vllm-ascend`.
+- **Gateway data-plane on real NPU** — `/healthz`, `/hearth/queue` (incl. demand-linger), `/metrics`,
+  OpenAI passthrough (streaming + non-streaming), and cold-start SSE keepalive → activation timeout → `503`.
+
+### Not yet verified
+- Operator → Ascend device plugin → backend pod **scheduled and serving on the NPU**, and the full
+  integrated `0→1→N→0` loop on a real NPU node (the v1 "supported" milestone).
+
 ## [0.1.0] - 2026-06-06
 
 First **release (alpha)**. The core thesis — declarative, scale-to-zero serving of self-hosted
@@ -37,5 +71,6 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 ### Changed
 - Operator skips no-op `LLMService` status updates, avoiding optimistic-concurrency churn.
 
-[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.2.0-rc.1...HEAD
+[0.2.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/hearth-project/hearth/releases/tag/v0.1.0

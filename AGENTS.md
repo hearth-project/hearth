@@ -1,320 +1,227 @@
-# hearth - AI Agent Guide
+# Hearth Agent Guide
 
-## Project Structure
+## What Hearth Is
 
-**Single-group layout (default):**
-```
-cmd/main.go                    Manager entry (registers controllers/webhooks)
-api/<version>/*_types.go       CRD schemas (+kubebuilder markers)
-api/<version>/zz_generated.*   Auto-generated (DO NOT EDIT)
-internal/controller/*          Reconciliation logic
-internal/webhook/*             Validation/defaulting (if present)
-config/crd/bases/*             Generated CRDs (DO NOT EDIT)
-config/rbac/role.yaml          Generated RBAC (DO NOT EDIT)
-config/samples/*               Example CRs (edit these)
-Makefile                       Build/test/deploy commands
-PROJECT                        Kubebuilder metadata Auto-generated (DO NOT EDIT)
-```
+Hearth is a Kubernetes orchestration and lifecycle layer for scale-to-zero LLM serving. It owns
+declarative deployment, runtime selection, model loading and caching, health, accelerator
+scheduling, autoscaling integration, and metrics.
 
-**Multi-group layout** (for projects with multiple API groups):
-```
-api/<group>/<version>/*_types.go       CRD schemas by group
-internal/controller/<group>/*          Controllers by group
-internal/webhook/<group>/<version>/*   Webhooks by group and version (if present)
-```
+Keep changes on that boundary. Hearth does not implement inference kernels, device plugins,
+schedulers, or a fleet-level serving platform. Vendor-specific inference behavior belongs in vLLM
+or its vendor plugins; Hearth adapters should remain thin Kubernetes-layer translations.
 
-Multi-group layout organizes APIs by group name (e.g., `batch`, `apps`). Check the `PROJECT` file for `multigroup: true`.
+The API group is `serving.hearth.dev/v1alpha1`:
 
-**To convert to multi-group layout:**
-1. Run: `kubebuilder edit --multigroup=true`
-2. Move APIs: `mkdir -p api/<group> && mv api/<version> api/<group>/`
-3. Move controllers: `mkdir -p internal/controller/<group> && mv internal/controller/*.go internal/controller/<group>/`
-4. Move webhooks (if present): `mkdir -p internal/webhook/<group> && mv internal/webhook/<version> internal/webhook/<group>/`
-5. Update import paths in all files
-6. Fix `path` in `PROJECT` file for each resource
-7. Update test suite CRD paths (add one more `..` to relative paths)
+- `LLMService` is namespaced and describes the model, runtime selection, resources, caching,
+  scaling, and endpoint behavior.
+- `InferenceRuntime` is cluster-scoped and describes a reusable runtime image, accelerator,
+  scheduling, probes, lifecycle, and metrics. Its controller is intentionally passive; the
+  `LLMService` reconciler consumes it.
 
-## Critical Rules
+Read `docs/architecture.md` before changing component boundaries and `CONTRIBUTING.md` before
+changing contributor workflows.
 
-### Never Edit These (Auto-Generated)
-- `config/crd/bases/*.yaml` - from `make manifests`
-- `config/rbac/role.yaml` - from `make manifests`
-- `config/webhook/manifests.yaml` - from `make manifests`
-- `**/zz_generated.*.go` - from `make generate`
-- `PROJECT` - from `kubebuilder [OPTIONS]`
+## Repository Map
 
-### Never Remove Scaffold Markers
-Do NOT delete `// +kubebuilder:scaffold:*` comments. CLI injects code at these markers.
+| Path | Responsibility |
+|---|---|
+| `cmd/main.go` | Operator entry point, manager flags, schemes, and controller registration |
+| `cmd/gateway/main.go` | Per-service gateway binary entry point |
+| `api/v1alpha1/` | CRD Go types and Kubebuilder markers |
+| `internal/controller/` | `LLMService` and `InferenceRuntime` reconcilers plus envtest suite |
+| `internal/backend/` | Shared workload builders and the vendor-neutral adapter interface |
+| `internal/backend/{nvidia,ascend,moorethreads}/` | Built-in vendor adapters |
+| `internal/backend/registry/` | Registration of built-in adapters |
+| `internal/gateway/` | Cold-start-aware reverse proxy, backpressure, draining, and metrics |
+| `internal/model/` | Model URI resolution (`hf://`, `modelscope://`, and `pvc://`) |
+| `config/` | Kustomize deployment, generated CRDs/RBAC, samples, and observability assets |
+| `charts/hearth/` | Manually maintained Helm chart; CRDs are synchronized from `config/crd/bases/` |
+| `test/e2e/` | Isolated Kind manager E2E suite (`e2e` build tag) |
+| `test/scaletozero/` | KEDA + gateway + CPU stub scale-to-zero E2E suite (`e2e` build tag) |
+| `test/vllm-stub/` | CPU-only fake vLLM server and its tests |
+| `.github/workflows/` | CI source of truth |
 
-### Keep Project Structure
-Do not move files around. The CLI expects files in specific locations.
+There is one API group and no webhook implementation today. Do not convert the layout, move
+Kubebuilder-owned files, or scaffold new APIs/webhooks unless the task explicitly requires it. If
+scaffolding is required, use the matching `kubebuilder create ...` command and preserve the
+existing layout.
 
-### Always Use CLI Commands
-Always use `kubebuilder create api` and `kubebuilder create webhook` to scaffold. Do NOT create files manually.
+## Generated Files and Scaffold Markers
 
-### E2E Tests Require an Isolated Kind Cluster
-The e2e tests are designed to validate the solution in an isolated environment (similar to GitHub Actions CI).
-Ensure you run them against a dedicated [Kind](https://kind.sigs.k8s.io/) cluster (not your “real” dev/prod cluster).
+Never hand-edit these generated artifacts:
 
-## After Making Changes
+- `api/v1alpha1/zz_generated.deepcopy.go` — generated by `make generate`.
+- `config/crd/bases/*.yaml` — generated by `make manifests` from API markers.
+- `config/rbac/role.yaml` — generated by `make manifests` from RBAC markers.
+- `charts/hearth/crds/*.yaml` — copies of generated CRDs, synchronized by `make helm-crds`.
+- `PROJECT` — maintained by Kubebuilder CLI operations.
 
-**After editing `*_types.go` or markers:**
-```
-make manifests  # Regenerate CRDs/RBAC from markers
-make generate   # Regenerate DeepCopy methods
-```
+Do not remove or relocate any `+kubebuilder:scaffold:*` marker. Markers currently exist in Go test
+and entry-point files as well as Kustomize YAML.
 
-**After editing `*.go` files:**
-```
-make lint-fix   # Auto-fix code style
-make test       # Run unit tests
-```
-
-## CLI Commands Cheat Sheet
-
-### Create API (your own types)
-```bash
-kubebuilder create api --group <group> --version <version> --kind <Kind>
-```
-
-### Deploy Image Plugin (scaffold to deploy/manage ANY container image)
-
-Generate a controller that deploys and manages a container image (nginx, redis, memcached, your app, etc.):
+After changing API types, validation/default markers, resource scope, or RBAC markers, run:
 
 ```bash
-# Example: deploying memcached
-kubebuilder create api --group example.com --version v1alpha1 --kind Memcached \
-  --image=memcached:alpine \
-  --plugins=deploy-image.go.kubebuilder.io/v1-alpha
-```
-
-Scaffolds good-practice code: reconciliation logic, status conditions, finalizers, RBAC. Use as a reference implementation.
-
-
-### Create Webhooks
-```bash
-# Validation + defaulting
-kubebuilder create webhook --group <group> --version <version> --kind <Kind> \
-  --defaulting --programmatic-validation
-
-# Conversion webhook (for multi-version APIs)
-kubebuilder create webhook --group <group> --version v1 --kind <Kind> \
-  --conversion --spoke v2
-```
-
-### Controller for Core Kubernetes Types
-```bash
-# Watch Pods
-kubebuilder create api --group core --version v1 --kind Pod \
-  --controller=true --resource=false
-
-# Watch Deployments
-kubebuilder create api --group apps --version v1 --kind Deployment \
-  --controller=true --resource=false
-```
-
-### Controller for External Types (e.g., from other operators)
-
-Watch resources from external APIs (cert-manager, Argo CD, Istio, etc.):
-
-```bash
-# Example: watching cert-manager Certificate resources
-kubebuilder create api \
-  --group cert-manager --version v1 --kind Certificate \
-  --controller=true --resource=false \
-  --external-api-path=github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1 \
-  --external-api-domain=io \
-  --external-api-module=github.com/cert-manager/cert-manager
-```
-
-**Note:** Use `--external-api-module=<module>@<version>` only if you need a specific version. Otherwise, omit `@<version>` to use what's in go.mod.
-
-### Webhook for External Types
-
-```bash
-# Example: validating external resources
-kubebuilder create webhook \
-  --group cert-manager --version v1 --kind Issuer \
-  --defaulting \
-  --external-api-path=github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1 \
-  --external-api-domain=io \
-  --external-api-module=github.com/cert-manager/cert-manager
-```
-
-## Testing & Development
-
-```bash
-make test              # Run unit tests (uses envtest: real K8s API + etcd)
-make run               # Run locally (uses current kubeconfig context)
-```
-
-Tests use **Ginkgo + Gomega** (BDD style). Check `suite_test.go` for setup.
-
-## Deployment Workflow
-
-```bash
-# 1. Regenerate manifests
 make manifests generate
-
-# 2. Build & deploy
-export IMG=<registry>/<project>:tag
-make docker-build docker-push IMG=$IMG  # Or: kind load docker-image $IMG --name <cluster>
-make deploy IMG=$IMG
-
-# 3. Test
-kubectl apply -k config/samples/
-
-# 4. Debug
-kubectl logs -n <project>-system deployment/<project>-controller-manager -c manager -f
+make helm-crds
 ```
 
-### API Design
+Commit the source and all resulting generated changes together. Inspect generated diffs; do not
+accept unrelated churn. `make deploy` and `make build-installer` run `kustomize edit set image` in
+`config/manager/`, so check for incidental image changes before committing.
 
-**Key markers for** `api/<version>/*_types.go`:
+The Helm templates are not generated from `config/`. Keep them aligned manually:
 
-```go
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Namespaced
-// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=".status.conditions[?(@.type=='Ready')].status"
+- RBAC changes may require `charts/hearth/templates/rbac.yaml` updates.
+- Manager flags or deployment settings may require both `config/manager/manager.yaml` and
+  `charts/hearth/templates/deployment.yaml` updates.
+- API changes require `make helm-crds`.
 
-// On fields:
-// +kubebuilder:validation:Required
-// +kubebuilder:validation:Minimum=1
-// +kubebuilder:validation:MaxLength=100
-// +kubebuilder:validation:Pattern="^[a-z]+$"
-// +kubebuilder:default="value"
-```
+## Architecture and Controller Invariants
 
-- **Use** `metav1.Condition` for status (not custom string fields)
-- **Use predefined types**: `metav1.Time` instead of `string` for dates
-- **Follow K8s API conventions**: Standard field names (`spec`, `status`, `metadata`)
+One `LLMService` normally reconciles to:
 
-### Controller Design
+- a backend Deployment and Service;
+- a gateway Deployment and public Service;
+- an optional cache PVC and prewarm Job;
+- an optional KEDA `ScaledObject`;
+- an optional Prometheus Operator `ServiceMonitor`.
 
-**RBAC markers in** `internal/controller/*_controller.go`:
+Preserve these patterns:
 
-```go
-// +kubebuilder:rbac:groups=mygroup.example.com,resources=mykinds,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=mygroup.example.com,resources=mykinds/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=mygroup.example.com,resources=mykinds/finalizers,verbs=update
-// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-```
+- Reconciliation must be idempotent.
+- Mutable owned resources use server-side apply with field owner `hearth-operator` and controller
+  references.
+- Cache PVCs and prewarm Jobs contain immutable fields and are created once rather than updated in
+  place. Understand replacement and ownership behavior before changing them.
+- Missing KEDA or Prometheus CRDs are supported. Optional-resource apply must continue to skip
+  `NoMatch` errors rather than making those operators mandatory.
+- Watch owned Kubernetes resources with controller-runtime rather than relying on periodic
+  requeues.
+- Update status only when it changed. Use `metav1.Condition` and set `ObservedGeneration`.
+- Do not set backend Deployment replicas in the builder; KEDA owns the `0..N` replica count.
+- Keep gateway replicas separate from backend replicas. One gateway gives the current crispest
+  scale-from-zero behavior; higher counts trade activation accuracy for availability.
+- Keep vendor-specific behavior behind `backend.BackendAdapter`. Put behavior common to vLLM
+  runtimes in shared builders.
+- Continue using unstructured objects for optional external CRDs unless adding a typed dependency
+  is an explicit design decision.
 
-**Implementation rules:**
-- **Idempotent reconciliation**: Safe to run multiple times
-- **Re-fetch before updates**: `r.Get(ctx, req.NamespacedName, obj)` before `r.Update` to avoid conflicts
-- **Structured logging**: `log := log.FromContext(ctx); log.Info("msg", "key", val)`
-- **Owner references**: Enable automatic garbage collection (`SetControllerReference`)
-- **Watch secondary resources**: Use `.Owns()` or `.Watches()`, not just `RequeueAfter`
-- **Finalizers**: Clean up external resources (buckets, VMs, DNS entries)
+When adding a backend vendor, update all applicable surfaces:
 
-### Logging
+1. Add the adapter package and focused rendering tests under `internal/backend/<vendor>/`.
+2. Register it in `internal/backend/registry/registry.go`.
+3. Add the vendor to the API validation enum in `api/v1alpha1/inferenceruntime_types.go`.
+4. Add or update a sample `InferenceRuntime` and its `config/samples/kustomization.yaml` entry.
+5. Update relevant user documentation and support/validation claims.
+6. Regenerate manifests, deepcopy code, and Helm CRDs.
 
-**Follow Kubernetes logging message style guidelines:**
+Do not claim hardware support from manifest-only tests. Clearly distinguish unit/rendering
+validation from testing on real accelerators.
 
-- Start from a capital letter
-- Do not end the message with a period
-- Active voice: subject present (`"Deployment could not create Pod"`) or omitted (`"Could not create Pod"`)
-- Past tense: `"Could not delete Pod"` not `"Cannot delete Pod"`
-- Specify object type: `"Deleted Pod"` not `"Deleted"`
-- Balanced key-value pairs
+## Change Workflows
 
-```go
-log.Info("Starting reconciliation")
-log.Info("Created Deployment", "name", deploy.Name)
-log.Error(err, "Failed to create Pod", "name", name)
-```
+### Go code
 
-**Reference:** https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md#message-style-guidelines
+For any Go change, add or update the closest tests. The repository uses both standard `testing`
+tests and Ginkgo/Gomega envtest suites; follow the surrounding package rather than converting test
+styles.
 
-### Webhooks
-- **Create all types together**: `--defaulting --programmatic-validation --conversion`
-- **When`--force`is used**: Backup custom logic first, then restore after scaffolding
-- **For multi-version APIs**: Use hub-and-spoke pattern (`--conversion --spoke v2`)
-  - Hub version: Usually oldest stable version (v1)
-  - Spoke versions: Newer versions that convert to/from hub (v2, v3)
-  - Example: `--group crew --version v1 --kind Captain --conversion --spoke v2` (v1 is hub, v2 is spoke)
-
-### Learning from Examples
-
-The **deploy-image plugin** scaffolds a complete controller following good practices. Use it as a reference implementation:
+Run:
 
 ```bash
-kubebuilder create api --group example --version v1alpha1 --kind MyApp \
-  --image=<your-image> --plugins=deploy-image.go.kubebuilder.io/v1-alpha
+make test
+make lint
 ```
 
-Generated code includes: status conditions (`metav1.Condition`), finalizers, owner references, events, idempotent reconciliation.
+`make test` is not read-only: it runs manifests, generation, formatting, vet, downloads/uses
+envtest assets, and writes `cover.out`. Review the worktree afterward.
 
-## Distribution Options
-
-### Option 1: YAML Bundle (Kustomize)
+Useful focused commands for fast iteration include:
 
 ```bash
-# Generate dist/install.yaml from Kustomize manifests
-make build-installer IMG=<registry>/<project>:tag
+go test ./internal/backend/...
+go test ./internal/gateway/...
+go test ./internal/model/...
+go test ./test/vllm-stub/...
 ```
 
-**Key points:**
-- The `dist/install.yaml` is generated from Kustomize manifests (CRDs, RBAC, Deployment)
-- Commit this file to your repository for easy distribution
-- Users only need `kubectl` to install (no additional tools required)
+Controller tests need envtest binaries; use `make test` unless `KUBEBUILDER_ASSETS` is already set.
 
-**Example:** Users install with a single command:
-```bash
-kubectl apply -f https://raw.githubusercontent.com/<org>/<repo>/<tag>/dist/install.yaml
-```
+### APIs and samples
 
-### Option 2: Helm Chart
+When changing `api/v1alpha1/*_types.go`:
 
-```bash
-kubebuilder edit --plugins=helm/v2-alpha                      # Generates dist/chart/ (default)
-kubebuilder edit --plugins=helm/v2-alpha --output-dir=charts  # Generates charts/chart/
-```
+- use Kubernetes API conventions and existing field naming patterns;
+- add precise Kubebuilder validation/default markers;
+- consider backward compatibility because the API is versioned even while `v1alpha1`;
+- update `docs/crd-reference.md`, samples, controller/builders, and tests as applicable;
+- run the generation commands and normal Go checks.
 
-**For development:**
-```bash
-make helm-deploy IMG=<registry>/<project>:<tag>          # Deploy manager via Helm
-make helm-deploy IMG=$IMG HELM_EXTRA_ARGS="--set ..."    # Deploy with custom values
-make helm-status                                         # Show release status
-make helm-uninstall                                      # Remove release
-make helm-history                                        # View release history
-make helm-rollback                                       # Rollback to previous version
-```
+`InferenceRuntime` is cluster-scoped even if stale scaffold metadata suggests otherwise; the type
+marker and generated CRD are authoritative.
 
-**For end users/production:**
-```bash
-helm install my-release ./<output-dir>/chart/ --namespace <ns> --create-namespace
-```
+### Gateway and scale-to-zero
 
-**Important:** If you add webhooks or modify manifests after initial chart generation:
-1. Backup any customizations in `<output-dir>/chart/values.yaml` and `<output-dir>/chart/manager/manager.yaml`
-2. Re-run: `kubebuilder edit --plugins=helm/v2-alpha --force` (use same `--output-dir` if customized)
-3. Manually restore your custom values from the backup
+Gateway changes affect request admission, cold-start waiting, SSE heartbeats, forwarding,
+backpressure, draining, and Prometheus metrics. Cover success, timeout, rejection, streaming, and
+cancellation paths as relevant. If behavior changes across KEDA activation or scale-down, run the
+scale-to-zero E2E suite in addition to unit tests.
 
-### Publish Container Image
+### Helm, Kustomize, and images
+
+The project publishes separate operator and gateway images:
 
 ```bash
-export IMG=<registry>/<project>:<version>
-make docker-build docker-push IMG=$IMG
+make docker-build IMG=<operator-image>
+make docker-build-gateway GATEWAY_IMG=<gateway-image>
 ```
 
-## References
+The CPU test image is built with `make docker-build-stub`. `CONTAINER_TOOL` defaults to Docker and
+may be set to Podman where supported.
 
-### Essential Reading
-- **Kubebuilder Book**: https://book.kubebuilder.io (comprehensive guide)
-- **controller-runtime FAQ**: https://github.com/kubernetes-sigs/controller-runtime/blob/main/FAQ.md (common patterns and questions)
-- **Good Practices**: https://book.kubebuilder.io/reference/good-practices.html (why reconciliation is idempotent, status conditions, etc.)
-- **Logging Conventions**: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/logging.md#message-style-guidelines (message style, verbosity levels)
+There are no `make helm-deploy`, `helm-status`, or other Helm lifecycle targets. Validate or install
+the chart with Helm itself. Keep `charts/hearth/Chart.yaml`, values, templates, README/install
+instructions, and release behavior aligned when packaging changes.
 
-### API Design & Implementation
-- **API Conventions**: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
-- **Operator Pattern**: https://kubernetes.io/docs/concepts/extend-kubernetes/operator/
-- **Markers Reference**: https://book.kubebuilder.io/reference/markers.html
+### Documentation-only changes
 
-### Tools & Libraries
-- **controller-runtime**: https://github.com/kubernetes-sigs/controller-runtime
-- **controller-tools**: https://github.com/kubernetes-sigs/controller-tools
-- **Kubebuilder Repo**: https://github.com/kubernetes-sigs/kubebuilder
+Check commands, paths, flags, versions, image names, and support claims against source. Prefer
+links to the detailed docs over copying long tutorials into `AGENTS.md` or `README.md`.
+
+## Verification Matrix
+
+| Command | Purpose | Requirements / effects |
+|---|---|---|
+| `make build` | Generate, format, vet, and build manager + gateway | Writes `bin/` and may update generated/formatted files |
+| `make test` | Unit, standard Go, stub, and controller envtest coverage | Excludes `/e2e`; downloads local tools/assets; writes `cover.out` |
+| `make lint` | CI lint and formatting checks | Builds/downloads the pinned custom golangci-lint binary |
+| `make lint-fix` | Apply supported lint/format fixes | Mutates source; inspect all edits |
+| `make test-e2e` | Manager deployment and metrics E2E | Creates isolated Kind cluster `hearth-test-e2e`; clean up manually after a failure |
+| `make test-scale-e2e` | No-GPU `0→1→N→0`, drain, and reject-mode loop | Requires an existing dedicated Kind cluster named `kind` by default plus KEDA |
+| `make helm-crds` | Regenerate and copy CRDs into the chart | Required after API/marker changes |
+| `make build-installer IMG=...` | Build `dist/install.yaml` | Mutates the configured manager image via Kustomize |
+
+E2E commands interact with Kubernetes. Use only dedicated disposable Kind clusters, confirm the
+current kube-context first, and never aim them at a development, staging, or production cluster.
+The standard E2E and scale-to-zero E2E have different setup: `make test-e2e` manages its own named
+cluster, while `make test-scale-e2e` expects the cluster and KEDA to exist already.
+
+## Code and Review Style
+
+- Use Go 1.26 or the version declared by `go.mod` and the Dockerfiles.
+- Keep the existing Apache-2.0 header on Go files.
+- Prefer small, focused changes and avoid unrelated refactors or generated churn.
+- Explain non-obvious Kubernetes ownership, lifecycle, and scale-to-zero decisions in comments.
+- Use structured controller-runtime logging with balanced key/value pairs.
+- Log messages start with a capital letter, do not end with punctuation, name the object or action,
+  and use past tense for failures (for example, `"Failed to create Deployment"`).
+- Follow existing naming and labels, especially `serving.hearth.dev/*` and
+  `app.kubernetes.io/*` contracts used by Services, Deployments, KEDA, and ServiceMonitor selectors.
+- Do not add dependencies when Kubernetes unstructured objects or the standard library already
+  match the established approach.
+- When asked to commit, use a focused Conventional Commit subject and include DCO sign-off with
+  `git commit -s`. Do not create commits unless the user requests them.
+
+Before declaring a task complete, inspect `git diff`, run checks proportionate to the changed
+area, and report exactly what ran and what was not run.

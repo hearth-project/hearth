@@ -1,0 +1,58 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: vllm-ascend-310p-duo
+# Validation profile for Huawei Atlas 300I Duo on Ubuntu. This profile has rendering
+# coverage but must not be described as hardware-verified until the physical runbook passes.
+spec:
+  family: vllm
+  vendor: ascend
+  # Keep the verified 910B runtime (priority 100) ahead of this validation profile
+  # for broad vendor selectors. Validation services pin this runtime by name.
+  priority: 90
+  container:
+    image: quay.io/ascend/vllm-ascend:v0.22.1rc1-310p
+    args:
+      - --model={{ .Model.Path }}
+      - --served-model-name={{ .Service.Name }}
+      - --port=8000
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    # Standard non-mixed, whole-device resource reported by Ascend Device Plugin.
+    resourceName: huawei.com/Ascend310P
+    sharing:
+      supported: false
+    nodeSelector:
+      accelerator: huawei-Ascend310P
+      serving.hearth.dev/ascend-product: atlas-300i-duo
+  health:
+    readiness:
+      httpGet:
+        path: /health
+        port: http
+    liveness:
+      httpGet:
+        path: /health
+        port: http
+      failureThreshold: 6
+    startup:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+      failureThreshold: 180
+  lifecycle:
+    terminationGracePeriodSeconds: 120
+    preStopDrain: true
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:gpu_cache_usage_perc
+    running: vllm:num_requests_running
+    ttft: vllm:time_to_first_token_seconds

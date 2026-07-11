@@ -3,6 +3,8 @@
 > Early and growing. Start here; more guides, including a spot-GPU walkthrough, are on the way.
 
 - [Architecture](architecture.md) — components, the two CRDs, and the scale-to-zero data flow.
+- [Ascend 910B validation](ascend-910b-validation.md) — real-hardware results and the remaining scheduling step.
+- [Ascend 310P deployment validation](ascend-310p-validation.md) — Atlas 300I Duo and Atlas 300I Pro configuration and physical-validation runbook.
 - [CRD reference](crd-reference.md) — field-by-field `LLMService` spec reference.
 - [Observability](observability.md) — Grafana dashboard import steps and gateway metrics.
 - [Roadmap](../ROADMAP.md) — what's verified, and the prioritized path to production.

@@ -130,6 +130,7 @@ resource, probes, metrics). Adapter **code** is thin because the differences are
 |---|---|---|---|
 | `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
 | `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 experimental preview — serves on real 910B; render + gateway verified; full scheduling e2e pending ([report](docs/ascend-910b-validation.md)) |
+| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | 🧰 validation configuration for Atlas 300I Duo + Atlas 300I Pro; rendering-tested, physical validation pending ([runbook](docs/ascend-310p-validation.md)) |
 | `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
 
 Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).

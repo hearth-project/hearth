@@ -1,0 +1,39 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: LLMService
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: qwen-310p-pro-validation
+spec:
+  model:
+    source:
+      uri: modelscope://Qwen/Qwen2.5-0.5B-Instruct
+  runtime:
+    name: vllm-ascend-310p-pro
+    argsOverride:
+      # 310P builds a quadratic attention mask; never rely on automatic context sizing.
+      - --max-model-len=2048
+      # Establish a conservative smoke-test baseline before graph-mode tuning.
+      - --enforce-eager
+  resources:
+    accelerators: 1
+    cpu: "4"
+    memory: 16Gi
+  scaling:
+    min: 0
+    max: 1
+    metric: queueDepth
+    target: 1
+    activationTimeout: 10m
+    scaleDownStabilization: 5m
+    drainTimeout: 2m
+  cache:
+    strategy: NodeLocalPVC
+    size: 20Gi
+    prewarm: true
+  endpoint:
+    openAICompatible: true
+    coldStart:
+      mode: keepalive
+      heartbeatInterval: 10s

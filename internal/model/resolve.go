@@ -19,17 +19,17 @@ package model
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 	"github.com/hearth-project/hearth/internal/backend"
 )
 
-// Resolve maps a model spec to a repo id plus the env needed to fetch it. v0 lets the
-// runtime download weights at startup; local caching (PVC/hostPath) arrives in a later
-// milestone, and catalogRef resolution along with it.
+// Resolve maps a model source to the path and environment consumed by the runtime.
 func Resolve(model servingv1alpha1.ModelSpec) (backend.ResolvedModel, error) {
 	if model.Source == nil || model.Source.URI == "" {
 		if model.CatalogRef != "" {
@@ -57,10 +57,12 @@ func Resolve(model servingv1alpha1.ModelSpec) (backend.ResolvedModel, error) {
 			Env:    []corev1.EnvVar{{Name: "VLLM_USE_MODELSCOPE", Value: "true"}},
 		}, nil
 	case "pvc":
-		// pvc://<claim>/<subpath>: weights pre-staged on an existing PVC (air-gapped).
 		pvcName, subpath, _ := strings.Cut(ref, "/")
-		if pvcName == "" {
+		if errs := validation.IsDNS1123Subdomain(pvcName); len(errs) > 0 {
 			return backend.ResolvedModel{}, fmt.Errorf("invalid pvc uri %q: expected pvc://<claim>[/<subpath>]", model.Source.URI)
+		}
+		if subpath != "" && (path.IsAbs(subpath) || path.Clean(subpath) != subpath || subpath == ".." || strings.HasPrefix(subpath, "../")) {
+			return backend.ResolvedModel{}, fmt.Errorf("invalid pvc uri %q: subpath must stay within the model volume", model.Source.URI)
 		}
 		return backend.ResolvedModel{Path: subpath, Source: "pvc", PVC: pvcName}, nil
 	default:

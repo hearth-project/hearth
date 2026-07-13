@@ -79,6 +79,12 @@ func TestResolveErrors(t *testing.T) {
 	_, err = model.Resolve(src("pvc:///model")) // empty PVC name
 	g.Expect(err).To(HaveOccurred())
 
+	_, err = model.Resolve(src("pvc://model-store/../secret"))
+	g.Expect(err).To(MatchError(ContainSubstring("subpath")))
+
+	_, err = model.Resolve(src("pvc://Invalid_Claim/model"))
+	g.Expect(err).To(MatchError(ContainSubstring("pvc uri")))
+
 	_, err = model.Resolve(servingv1alpha1.ModelSpec{CatalogRef: "qwen3-8b-instruct"})
 	g.Expect(err).To(HaveOccurred())
 }

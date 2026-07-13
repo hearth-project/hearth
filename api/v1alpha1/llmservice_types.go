@@ -96,6 +96,7 @@ type RuntimeSelector struct {
 // accelerator definition at reconcile time.
 type ResourceSpec struct {
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	Accelerators int32 `json:"accelerators,omitempty"`
 
@@ -122,13 +123,16 @@ type AcceleratorFraction struct {
 
 // ScalingSpec configures KEDA-driven autoscaling. Scaling is intentionally limited
 // to LLM-aware signals: CPU and raw RPS are not supported.
+// +kubebuilder:validation:XValidation:rule="self.min <= self.max",message="min must not exceed max"
 type ScalingSpec struct {
 	// min replicas; 0 enables scale-to-zero.
 	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Min int32 `json:"min,omitempty"`
 
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	Max int32 `json:"max,omitempty"`
 
@@ -141,6 +145,7 @@ type ScalingSpec struct {
 
 	// target is the desired metric value per replica.
 	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	Target int32 `json:"target,omitempty"`
 

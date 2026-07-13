@@ -19,7 +19,7 @@ shown below when a default is defined.
 | `spec.model.catalogRef` | string | - | Optional catalog entry name for a model resolved outside the inline source block. 🚧 **Not yet implemented in v0** — use `spec.model.source.uri` instead. See [#33](https://github.com/hearth-project/hearth/issues/33). |
 | `spec.model.source` | object | - | Inline model source configuration. |
 | `spec.model.source.uri` | string | required when `source` is set | Model location. Supported in v0: `hf://`, `modelscope://`, and `pvc://<claim>[/<subpath>]` (weights pre-staged on an existing PVC, mounted read-only at `/models` — no download; pair with `cache.strategy: None`). `oci://` and `s3://` are not implemented yet. See [#36](https://github.com/hearth-project/hearth/issues/36). |
-| `spec.model.source.secretRef` | object | - | Credentials for private model sources, represented as a Kubernetes `LocalObjectReference`. |
+| `spec.model.source.secretRef` | object | - | Reserved for private model sources; currently rejected during reconciliation. |
 | `spec.model.source.secretRef.name` | string | `""` | Name of the Secret holding source credentials. |
 | `spec.runtime` | object | - | Backend runtime selection. Pin a runtime by name or provide a vendor preference selector. |
 | `spec.runtime.name` | string | - | Exact `InferenceRuntime` name to use, such as `vllm-nvidia`. |
@@ -27,17 +27,17 @@ shown below when a default is defined.
 | `spec.runtime.selector.vendor` | string array | - | Acceptable vendors in preference order, for example `["nvidia", "ascend"]`. |
 | `spec.runtime.argsOverride` | string array | - | Additional or overriding serving arguments appended to the selected runtime's templated args. |
 | `spec.resources` | object | - | Abstract accelerator, CPU, and memory request mapped onto the selected runtime at reconcile time. |
-| `spec.resources.accelerators` | integer | `1` | Number of whole accelerator devices to request. |
-| `spec.resources.fraction` | object | - | Sub-device slice request. Valid only when the selected runtime supports accelerator sharing. |
+| `spec.resources.accelerators` | integer | `1`, minimum `1` | Number of whole accelerator devices to request. |
+| `spec.resources.fraction` | object | - | Reserved for sub-device sharing; currently rejected during reconciliation. |
 | `spec.resources.fraction.memory` | quantity | - | Memory portion for a fractional accelerator request. |
 | `spec.resources.fraction.cores` | integer | - | Core count for a fractional accelerator request. |
 | `spec.resources.cpu` | quantity | - | CPU request for the serving workload. |
 | `spec.resources.memory` | quantity | - | Memory request for the serving workload. |
 | `spec.scaling` | object | - | KEDA-driven autoscaling configuration. Hearth supports LLM-aware signals rather than CPU or raw RPS. |
-| `spec.scaling.min` | integer | `0` | Minimum backend replicas. `0` enables scale-to-zero. |
-| `spec.scaling.max` | integer | `1` | Maximum backend replicas. |
+| `spec.scaling.min` | integer | `0`, minimum `0` | Minimum backend replicas. `0` enables scale-to-zero. |
+| `spec.scaling.max` | integer | `1`, minimum `1` | Maximum backend replicas. |
 | `spec.scaling.metric` | string | default `queueDepth`; enum `queueDepth`, `kvCacheUtil` | LLM-aware metric used for scaling decisions. |
-| `spec.scaling.target` | integer | `10` | Desired metric value per replica. |
+| `spec.scaling.target` | integer | `10`, minimum `1` | Desired metric value per replica. |
 | `spec.scaling.activationTimeout` | duration string | `5m` | How long the gateway can buffer a request while waiting for a cold backend to become ready. |
 | `spec.scaling.scaleDownStabilization` | duration string | `5m` | Stabilization window before scaling down after demand drops. |
 | `spec.scaling.drainTimeout` | duration string | `2m` | Time allowed for in-flight requests to drain. Must be no greater than the runtime termination grace period. |
@@ -56,3 +56,29 @@ shown below when a default is defined.
 
 Kubernetes quantity fields accept standard resource quantity strings such as `8`, `500m`, `32Gi`,
 or `60Gi`. Duration fields use Go/Kubernetes duration strings such as `10s`, `2m`, or `5m`.
+
+## InferenceRuntime
+
+`InferenceRuntime` is cluster-scoped configuration consumed by the `LLMService` controller. Its own
+controller is passive. Changing a runtime requeues services that pin it or select its vendor.
+
+| Field | Required | Description |
+|---|---|---|
+| `spec.family` | yes | Runtime family; defaults to `vllm`. |
+| `spec.vendor` | yes | Adapter key: `nvidia`, `ascend`, `cambricon`, `hygon`, or `moorethreads`. An adapter must also be registered in code. |
+| `spec.priority` | no | Tie-breaker within one vendor; higher values win. Vendor order in an `LLMService` selector wins before priority. |
+| `spec.container.image` | yes | Serving image. It must expose an OpenAI-compatible API and the configured metrics endpoint. |
+| `spec.container.args` | no | Go templates rendered with `.Model.Path`, `.Service.Name`, and `.Service.Namespace`. Service `argsOverride` values are appended. |
+| `spec.container.env` | no | Container environment; literal values may use the same templates. |
+| `spec.container.port` | yes | Shared API and metrics port. `containerPort` must be between `1` and `65535`. |
+| `spec.accelerator.resourceName` | yes | Extended resource advertised by the installed device plugin. |
+| `spec.accelerator.nodeSelector` | no | Labels required on the accelerator node. |
+| `spec.accelerator.tolerations` | no | Tolerations copied to the serving Pod. |
+| `spec.accelerator.scheduler` | no | Optional scheduler name and Volcano queue. The queue becomes `scheduling.volcano.sh/queue-name`. |
+| `spec.health` | no | Readiness, liveness, and startup probes. Hearth supplies readiness and startup defaults when omitted. |
+| `spec.lifecycle.terminationGracePeriodSeconds` | no | Pod termination budget; minimum `1`. Hearth widens it when needed for draining. |
+| `spec.lifecycle.preStopDrain` | no | Adds a pre-stop wait using `/bin/sh`; the serving image must contain a shell. |
+| `spec.metrics` | yes | Metrics path, port name, and logical vLLM metric names. Queue depth is required. |
+
+Runtime definitions describe Kubernetes integration; they do not install drivers, device plugins,
+CANN, schedulers, or inference kernels.

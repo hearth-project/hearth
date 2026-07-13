@@ -71,6 +71,8 @@ type RuntimePort struct {
 	Name string `json:"name"`
 
 	// +kubebuilder:default=8000
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
 	ContainerPort int32 `json:"containerPort"`
 }
 
@@ -127,6 +129,7 @@ type RuntimeHealth struct {
 
 type RuntimeLifecycle struct {
 	// terminationGracePeriodSeconds must cover the longest in-flight stream.
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 

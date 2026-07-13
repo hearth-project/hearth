@@ -311,6 +311,8 @@ spec:
                       containerPort:
                         default: 8000
                         format: int32
+                        maximum: 65535
+                        minimum: 1
                         type: integer
                       name:
                         default: http
@@ -802,6 +804,7 @@ spec:
                     description: terminationGracePeriodSeconds must cover the longest
                       in-flight stream.
                     format: int64
+                    minimum: 1
                     type: integer
                 type: object
               metrics:

@@ -174,6 +174,7 @@ spec:
                   accelerators:
                     default: 1
                     format: int32
+                    minimum: 1
                     type: integer
                   cpu:
                     anyOf:
@@ -244,6 +245,7 @@ spec:
                   max:
                     default: 1
                     format: int32
+                    minimum: 1
                     type: integer
                   metric:
                     default: queueDepth
@@ -258,6 +260,7 @@ spec:
                     default: 0
                     description: min replicas; 0 enables scale-to-zero.
                     format: int32
+                    minimum: 0
                     type: integer
                   scaleDownStabilization:
                     default: 5m
@@ -266,8 +269,12 @@ spec:
                     default: 10
                     description: target is the desired metric value per replica.
                     format: int32
+                    minimum: 1
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: min must not exceed max
+                  rule: self.min <= self.max
             required:
             - model
             type: object

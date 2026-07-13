@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,7 +33,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 	"github.com/hearth-project/hearth/internal/backend"
@@ -284,10 +287,36 @@ func (r *LLMServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&servingv1alpha1.LLMService{}).
+		Watches(&servingv1alpha1.InferenceRuntime{}, handler.EnqueueRequestsFromMapFunc(r.servicesForRuntime)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&batchv1.Job{}).
 		Named("llmservice").
 		Complete(r)
+}
+
+// servicesForRuntime requeues services that reference a changed cluster-scoped runtime.
+func (r *LLMServiceReconciler) servicesForRuntime(ctx context.Context, obj client.Object) []reconcile.Request {
+	rt, ok := obj.(*servingv1alpha1.InferenceRuntime)
+	if !ok {
+		return nil
+	}
+
+	var services servingv1alpha1.LLMServiceList
+	if err := r.List(ctx, &services); err != nil {
+		logf.FromContext(ctx).Error(err, "Failed to list LLMServices for InferenceRuntime", "runtime", rt.Name)
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0)
+	for i := range services.Items {
+		svc := &services.Items[i]
+		selection := svc.Spec.Runtime
+		if selection.Name == rt.Name ||
+			(selection.Selector != nil && slices.Contains(selection.Selector.Vendor, rt.Spec.Vendor)) {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(svc)})
+		}
+	}
+	return requests
 }

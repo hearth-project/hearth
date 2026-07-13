@@ -17,10 +17,15 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 )
@@ -71,4 +76,38 @@ func TestPickByVendorNoMatch(t *testing.T) {
 	}
 	_, err := pickByVendor(items, []string{"ascend"})
 	g.Expect(err).To(MatchError(ContainSubstring("ascend")))
+}
+
+func TestServicesForRuntime(t *testing.T) {
+	g := NewWithT(t)
+	scheme := runtime.NewScheme()
+	g.Expect(servingv1alpha1.AddToScheme(scheme)).To(Succeed())
+
+	services := []servingv1alpha1.LLMService{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "pinned", Namespace: "ai"},
+			Spec:       servingv1alpha1.LLMServiceSpec{Runtime: servingv1alpha1.RuntimeSelection{Name: "vllm-ascend"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "selected", Namespace: "models"},
+			Spec: servingv1alpha1.LLMServiceSpec{Runtime: servingv1alpha1.RuntimeSelection{
+				Selector: &servingv1alpha1.RuntimeSelector{Vendor: []string{"ascend", "nvidia"}},
+			}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "unrelated", Namespace: "ai"},
+			Spec:       servingv1alpha1.LLMServiceSpec{Runtime: servingv1alpha1.RuntimeSelection{Name: "vllm-nvidia"}},
+		},
+	}
+	client := fake.NewClientBuilder().WithScheme(scheme).WithLists(&servingv1alpha1.LLMServiceList{Items: services}).Build()
+	r := &LLMServiceReconciler{Client: client}
+	rt := &servingv1alpha1.InferenceRuntime{
+		ObjectMeta: metav1.ObjectMeta{Name: "vllm-ascend"},
+		Spec:       servingv1alpha1.InferenceRuntimeSpec{Vendor: "ascend"},
+	}
+
+	g.Expect(r.servicesForRuntime(context.Background(), rt)).To(ConsistOf(
+		reconcile.Request{NamespacedName: types.NamespacedName{Name: "pinned", Namespace: "ai"}},
+		reconcile.Request{NamespacedName: types.NamespacedName{Name: "selected", Namespace: "models"}},
+	))
 }

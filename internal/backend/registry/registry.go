@@ -25,9 +25,7 @@ import (
 	"github.com/hearth-project/hearth/internal/backend/nvidia"
 )
 
-// New returns the default registry. v0 fully implements nvidia and scaffolds ascend +
-// moorethreads (golden-tested; moorethreads validated on real MTT S5000 hardware, ascend
-// on real NPUs in v1); the mlu adapter lands later.
+// New returns the registry of built-in Kubernetes adapters.
 func New() *backend.Registry {
 	r := backend.NewRegistry()
 	r.Register(nvidia.New())

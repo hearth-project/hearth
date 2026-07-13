@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A shared Ascend hardware-validation guide covering required images, validation levels, evidence,
+  and separate 910B, Atlas 300I Duo, and Atlas 300I Pro result sets.
+- Validation bounds for accelerator counts, scaling values, runtime ports, and termination grace
+  periods.
+
+### Changed
+- Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
+  node-local model data is prepared where the backend can run.
+- `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.
+
+### Fixed
+- Reject unsupported `BakedImage` cache requests instead of silently rendering them as uncached.
+- Reject invalid PVC claim names and model paths that could escape the mounted model volume.
+
 ## [0.2.0-rc.1] - 2026-06-27
 
 Pre-release documenting the first **real-hardware bring-up of the Ascend 910B backend**. vLLM-Ascend

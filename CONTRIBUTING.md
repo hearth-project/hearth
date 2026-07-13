@@ -23,10 +23,10 @@ side of that line.
 
 - **A new backend** — wire a chip as an adapter under [`internal/backend`](internal/backend) +
   golden tests. This is the project's whole thesis; high-value.
-- **Validate on real hardware** — especially **Ascend NPU** (the v1 milestone) — the adapter is
-  scaffolded and golden-tested but unproven on silicon. Real-hardware reports are gold.
+- **Validate on real hardware** — especially the complete Ascend device-plugin and scale-to-zero
+  path. Start with the [Ascend validation guide](docs/ascend-validation.md).
 - **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P1/P2** items
-  (`imagePullSecrets`, `pvc://`/`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
+  (`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
   and the **community track** (the KEDA external push scaler, #42) are great entry points.
 - **Docs, samples, bug reports, repros** — all welcome, no change too small.
 

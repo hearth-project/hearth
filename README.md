@@ -99,7 +99,7 @@ metadata:
 spec:
   model:
     source:
-      uri: modelscope://Qwen/Qwen3-8B-Instruct   # hf:// | modelscope:// | oci:// | s3:// | pvc://
+      uri: modelscope://Qwen/Qwen3-8B-Instruct   # hf:// | modelscope:// | pvc://
   runtime:
     selector: { vendor: [nvidia, ascend] }        # auto-pick a backend, in preference order
   resources:
@@ -157,12 +157,12 @@ kubectl get llmservice,deploy,svc -n ai
 
 This exercises the control plane: the operator reconciles an `LLMService` into its child objects. The
 gateway and backend pods start once you point the operator at a built gateway image
-(`go run ./cmd/main.go --gateway-image=<your-registry>/hearth-gateway:v0.1.0`) and provide a GPU node
+(`go run ./cmd/main.go --gateway-image=<your-registry>/hearth-gateway:<version>`) and provide an accelerator node
 with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
 
 ## Install
 
-> **`v0.1.0` — alpha.** Each release publishes the operator + gateway images and the chart to
+> **Alpha.** Each release publishes the operator + gateway images and the chart to
 > `ghcr.io/hearth-project`, so install is one command — no building required. Still alpha and **not
 > production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
 
@@ -199,9 +199,8 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **`v0.2.0-rc.1` (pre-release)** — **Ascend 910B experimental preview**: vLLM-Ascend serving verified
   on real 910B silicon, operator manifests confirmed correct, gateway data-plane verified on the NPU
   ([report](docs/ascend-910b-validation.md)). Device-plugin scheduling e2e still pending.
-- **v1** — domestic backends fully on real hardware: **Ascend 910B** first (close out the scheduling
-  e2e), Moore Threads (MUSA, MTT S5000) scaffolded behind it; Volcano/HAMi live validation;
-  private-delivery enablers (`imagePullSecrets`, `pvc://`/`oci://` sources).
+- **v1** — domestic backends fully on real hardware: **Ascend 910B and 310P** first, then Moore
+  Threads; Volcano/HAMi live validation; `oci://` sources and shared caching for private delivery.
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today

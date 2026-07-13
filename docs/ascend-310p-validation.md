@@ -15,6 +15,8 @@ claim.
 The profiles follow the official [vLLM-Ascend 310P guide](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/hardwares/310p.html),
 [installation guide](https://docs.vllm.ai/projects/ascend/en/main/installation/), and
 [Huawei Ascend Device Plugin guide](https://www.hiascend.com/document/detail/en/mindcluster/730/clustersched/schedulingug/dlug_installation_019.html).
+Shared image, evidence, and terminology requirements are in the
+[Ascend hardware validation guide](ascend-validation.md).
 
 ## Validation baseline
 
@@ -110,46 +112,32 @@ make install
 If the cluster has no default dynamic StorageClass, set `cache.storageClassName` in both service
 samples before applying them, or use a deliberately prepared HostPath cache.
 
-## 5. Deploy Atlas 300I Duo
+## 5. Deploy one product profile
+
+Run each profile separately so its evidence is unambiguous. Set `PROFILE` to `duo` or `pro`:
 
 ```bash
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime_ascend_310p_duo.yaml
-kubectl apply -n hearth-310p-validation \
-  -f config/samples/serving_v1alpha1_llmservice_ascend_310p_duo.yaml
+PROFILE=duo
+RUNTIME="config/samples/serving_v1alpha1_inferenceruntime_ascend_310p_${PROFILE}.yaml"
+SERVICE_FILE="config/samples/serving_v1alpha1_llmservice_ascend_310p_${PROFILE}.yaml"
+SERVICE="qwen-310p-${PROFILE}-validation"
+
+kubectl apply -f "$RUNTIME"
+kubectl apply -n hearth-310p-validation -f "$SERVICE_FILE"
 kubectl get llmservice,pvc,job,deploy,pod -n hearth-310p-validation -w
 ```
 
-Confirm node selection and device allocation:
+Confirm that the Pod landed on the intended node and requested one 310P:
 
 ```bash
 kubectl get pod -n hearth-310p-validation \
-  -l serving.hearth.dev/llmservice=qwen-310p-duo-validation \
+  -l "serving.hearth.dev/llmservice=$SERVICE" \
   -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,NPU:.spec.containers[0].resources.limits.huawei\.com/Ascend310P'
 ```
 
-## 6. Deploy Atlas 300I Pro
+## 6. Exercise inference and scale-to-zero
 
 ```bash
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime_ascend_310p_pro.yaml
-kubectl apply -n hearth-310p-validation \
-  -f config/samples/serving_v1alpha1_llmservice_ascend_310p_pro.yaml
-kubectl get llmservice,pvc,job,deploy,pod -n hearth-310p-validation -w
-```
-
-Confirm node selection and device allocation:
-
-```bash
-kubectl get pod -n hearth-310p-validation \
-  -l serving.hearth.dev/llmservice=qwen-310p-pro-validation \
-  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,NPU:.spec.containers[0].resources.limits.huawei\.com/Ascend310P'
-```
-
-## 7. Exercise inference and scale-to-zero
-
-Run this separately for each service:
-
-```bash
-SERVICE=qwen-310p-duo-validation # then qwen-310p-pro-validation
 kubectl get deploy "$SERVICE" -n hearth-310p-validation -w
 ```
 
@@ -170,7 +158,7 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 Record idle replicas at zero, the cold request causing `0 -> 1`, Loading-to-Ready status, a complete
 stream ending in `[DONE]`, and the backend returning to zero after the stabilization window.
 
-## 8. Troubleshooting
+## 7. Troubleshooting
 
 ### Backend remains Pending
 

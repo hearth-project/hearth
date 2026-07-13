@@ -8,6 +8,7 @@ yet verified** and is the v1 "supported" milestone.
 
 This is a deliberately honest split: three of the four bridges to "fully supported" are crossed; the
 fourth needs a *schedulable* NPU node (see [Why not full e2e](#why-not-the-full-e2e-yet)).
+Use the [shared Ascend validation guide](ascend-validation.md) for evidence and naming requirements.
 
 ## Verified environment
 

@@ -33,7 +33,7 @@ API group `serving.hearth.dev/v1alpha1`.
   `InferenceRuntime`) into the child objects below, via server-side apply, gracefully skipping
   optional CRDs (KEDA / Prometheus) when absent.
 - **Backend abstraction** (`internal/backend`) — a `BackendAdapter` interface + registry. Shared code
-  renders the vLLM pod, accelerator request, and metrics source; thin `nvidia` / `ascend` adapters
+  renders the vLLM pod, accelerator request, and metrics source; thin NVIDIA, Ascend, and Moore Threads adapters
   add vendor specifics. Adapters are golden-tested, so they're provable without hardware.
 - **Gateway** (`internal/gateway`) — the data plane: an OpenAI-compatible reverse proxy in front of
   each `LLMService`. It buffers requests during cold start, applies bounded-queue backpressure,
@@ -110,8 +110,11 @@ Grafana dashboard surfaces queue depth, replicas, cold-starts, and request outco
 ## Caching
 
 Cold-start cost is dominated by fetching + loading weights, so caching is what makes scale-to-zero
-usable. v0 supports `HostPath` and `NodeLocalPVC` (with a pinnable `storageClassName`), plus a
-prewarm Job that hydrates weights before first traffic. Node-local caches are per-node today;
+usable. Hearth supports `HostPath` and `NodeLocalPVC` (with a pinnable `storageClassName`), plus a
+prewarm Job for Hugging Face or ModelScope weights. A `pvc://` source mounts pre-staged weights
+read-only and skips prewarming. Node-local caches are per-node today;
 `SharedPVC` (RWX) for multi-node is on the roadmap.
+Prewarm Pods inherit the runtime's node selector, tolerations, and scheduler but do not consume an
+accelerator.
 For clusters without a dynamic StorageClass, see the HostPath sample in
 [`config/samples/serving_v1alpha1_llmservice_hostpath.yaml`](../config/samples/serving_v1alpha1_llmservice_hostpath.yaml).

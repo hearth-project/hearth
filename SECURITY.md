@@ -2,13 +2,13 @@
 
 ## Supported versions
 
-Hearth is **pre-release (`v0.1.0`, alpha)**. Only the latest release / `main` receives security
+Hearth is **alpha software**. Only the latest release and `main` receive security
 fixes; there are no maintained release branches or backports yet. This will firm up as the project
 approaches a stable `v1`.
 
 | Version | Supported |
 |---|---|
-| `main` / latest `v0.1.x` pre-release | ✅ |
+| `main` / latest release | ✅ |
 | anything older | ❌ |
 
 ## Reporting a vulnerability

@@ -59,6 +59,10 @@ anything requiring auth, SLAs, or stability guarantees.
         unprivileged container, so nested k8s couldn't run). Closing this earns the claim
         *"validated end-to-end on real domestic silicon (Ascend 910B)"*.
 
+  Validate **Ascend 310P** independently on both Atlas 300I Duo and Atlas 300I Pro. The runtime
+  profiles and rendering tests exist, but neither profile has a real-hardware result yet. Follow the
+  [310P runbook](docs/ascend-310p-validation.md) and keep separate evidence for each product.
+
       The **Moore Threads (MUSA)** backend (`moorethreads` + `vllm-musa`, MTT S5000) is in-repo,
       scaffolded + golden-tested, ready as the second backend.
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
@@ -66,9 +70,9 @@ anything requiring auth, SLAs, or stability guarantees.
       sharing / gang scheduling follows.
 
 ### P1 — unblock private / enterprise delivery
-- [ ] **`imagePullSecrets`** — private-registry support on backend/prewarm/gateway (Xinchuang/enterprise).
-- [ ] **`pvc://` + `oci://` model sources** — pre-staged weights, no egress at serve time; the
-      prerequisite for the air-gapped bundle.
+- [x] **`imagePullSecrets`** — private-registry support on backend, prewarm, and gateway Pods.
+- [x] **`pvc://` model sources** — pre-staged, read-only weights with no download at serve time.
+- [ ] **`oci://` model sources** — portable offline model delivery for the air-gapped bundle.
 - [ ] **`SharedPVC` (RWX) cache** — node-local cache is per-node today, so each new replica
       re-downloads weights; RWX shared cache fixes multi-node cold starts.
 - [ ] **Reliable multi-node scale-out** — a replica on a node without the runtime image cached pays a

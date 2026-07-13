@@ -2,8 +2,9 @@
 
 # 🔥 Hearth
 
-**Scale-to-zero serving for open-source LLMs on Kubernetes — one CRD + KEDA, no platform to
-adopt. Vendor-neutral across NVIDIA, Ascend, and more.**
+**A minimal, composable LLM serving control plane for private Kubernetes clusters.**
+
+Declarative, vendor-neutral, scale-to-zero serving across NVIDIA, Ascend, and more.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/hearth-project/hearth)](go.mod)
@@ -15,10 +16,9 @@ adopt. Vendor-neutral across NVIDIA, Ascend, and more.**
 
 </div>
 
-Hearth is a small Kubernetes operator that turns "run Qwen / DeepSeek / GLM on my private cluster"
-into a single `LLMService` manifest: declarative deploy, queue-driven autoscaling, and
-**scale-to-zero** — with NVIDIA-vLLM / vLLM-Ascend (Cambricon planned) as **pluggable backends**
-behind one API, and nothing else to adopt.
+Hearth turns "run Qwen / DeepSeek / GLM on my private cluster" into a single `LLMService`
+manifest: declarative deployment, queue-driven autoscaling, and **scale-to-zero**, with
+NVIDIA-vLLM, vLLM-Ascend, and future runtimes as **pluggable backends** behind one API.
 
 > **Status — `v0.2.0-rc.1` (alpha).** The NVIDIA backend and the full scale-to-zero path
 > (gateway + KEDA) are **implemented and verified end-to-end on real NVIDIA GPUs** — cold-start
@@ -34,9 +34,9 @@ behind one API, and nothing else to adopt.
 
 The "LLM on K8s" space has excellent **platforms**: [KServe](https://kserve.github.io/website/) +
 [llm-d](https://llm-d.ai/) at datacenter scale, [AIBrix](https://github.com/vllm-project/aibrix) as
-vLLM's control plane, [Kthena](https://github.com/volcano-sh/kthena) for fleet-grade serving. Hearth
-is deliberately **not a platform**. It is the *smallest* thing that serves a few open-source LLMs
-well on a few accelerators:
+vLLM's control plane, and [Kthena](https://github.com/volcano-sh/kthena) for fleet-grade serving.
+Hearth focuses on the smaller end: serving a few open-source LLMs well on a few accelerators while
+composing with the Kubernetes infrastructure already in the cluster.
 
 - **One user-facing CRD + KEDA.** No router fleet, no webhook suite, no new autoscaler to learn —
   if KEDA runs on your cluster, you're most of the way there. Degrades gracefully when
@@ -54,7 +54,7 @@ well on a few accelerators:
 |---|---|---|
 | Inference engine | vLLM (+ `vllm-ascend` / `vllm-mlu`) | **Uses it.** Never re-implements; writes no chip kernels. |
 | GPU/NPU scheduling | device plugins, **HAMi**, **Volcano** | **Builds on.** Targets their resources; never replaces them. |
-| Serving platforms (routing, fleets, P/D disaggregation, datacenter scale-out) | **Kthena**, **AIBrix**, **KServe**/**llm-d** | **Complementary.** Hearth is the no-platform end of the same axis. |
+| Fleet routing, P/D disaggregation, and datacenter scale-out | **Kthena**, **AIBrix**, **KServe**/**llm-d** | **Composes with them.** Hearth remains the lightweight control plane for smaller deployments. |
 | Declarative lifecycle + scale-to-zero + vendor-neutral packaging, at the small end | — | **This is Hearth.** |
 
 ### Hearth and Kthena

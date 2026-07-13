@@ -1,5 +1,7 @@
 # Hearth documentation
 
+A minimal, composable LLM serving control plane for private Kubernetes clusters.
+
 > Early and growing. Start here; more guides, including a spot-GPU walkthrough, are on the way.
 
 - [Architecture](architecture.md) — components, the two CRDs, and the scale-to-zero data flow.

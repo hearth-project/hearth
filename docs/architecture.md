@@ -1,17 +1,17 @@
 # Architecture
 
-Hearth is a small Kubernetes operator that turns a single `LLMService` manifest into a declarative,
-queue-driven, **scale-to-zero** model server — one CRD + KEDA, no platform to adopt; vendor-neutral
-across NVIDIA, Ascend, and more.
+Hearth is a minimal, composable LLM serving control plane for private Kubernetes clusters. A single
+`LLMService` manifest produces a declarative, queue-driven, **scale-to-zero** model server across
+NVIDIA, Ascend, and other accelerators.
 
 ## Boundary (what Hearth is, and isn't)
 
 Hearth owns the **Kubernetes orchestration / lifecycle layer**: rendering workloads, model loading,
 health, scheduling adaptation, scale-to-zero, and metrics. It deliberately does **not** re-implement
 the inference engine (that's **vLLM** + vendor plugins) or write chip kernels / device plugins /
-schedulers (that's the vendors, **HAMi**, **Volcano**). Nor is it a serving **platform** — routing
-fleets, prefill/decode disaggregation, and datacenter scale-out belong to **Kthena**, **AIBrix**,
-and **KServe**/**llm-d**; Hearth is the lightweight, scale-to-zero end of that axis (see the
+schedulers (that's the vendors, **HAMi**, **Volcano**). Fleet routing, prefill/decode disaggregation,
+and datacenter scale-out belong to **Kthena**, **AIBrix**, and **KServe**/**llm-d**; Hearth composes
+with them as the lightweight, scale-to-zero end of that axis (see the
 README's ["Hearth and Kthena"](../README.md#hearth-and-kthena)). A new accelerator is a thin
 adapter, not a rewrite.
 

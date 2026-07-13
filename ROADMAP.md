@@ -111,8 +111,9 @@ anything requiring auth, SLAs, or stability guarantees.
 
 ## Ecosystem
 
-Hearth is deliberately the **no-platform end** of the LLM-serving axis. For fleet-grade serving —
-multi-model routing, prefill/decode disaggregation, datacenter scale-out — use
+Hearth is a **minimal, composable serving control plane** for the small end of the LLM-serving
+axis. For fleet-grade serving — multi-model routing, prefill/decode disaggregation, datacenter
+scale-out — use
 [Kthena](https://github.com/volcano-sh/kthena), [AIBrix](https://github.com/vllm-project/aibrix), or
 KServe/llm-d; they're excellent, and Hearth composes with them (hot models on the platform, the long
 tail scaled to zero with Hearth). We share operational lessons from Hearth's verified scale-to-zero

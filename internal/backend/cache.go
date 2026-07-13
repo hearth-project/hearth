@@ -18,6 +18,7 @@ package backend
 
 import (
 	"fmt"
+	"maps"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -61,8 +62,11 @@ func planCache(svc *servingv1alpha1.LLMService) (cacheArtifacts, error) {
 	}
 
 	switch strategy {
-	case "None", "BakedImage":
+	case "None":
 		return cacheArtifacts{}, nil
+
+	case "BakedImage":
+		return cacheArtifacts{}, fmt.Errorf("cache strategy %q is not supported yet", strategy)
 
 	case "HostPath":
 		hostType := corev1.HostPathDirectoryOrCreate
@@ -101,7 +105,6 @@ func planCache(svc *servingv1alpha1.LLMService) (cacheArtifacts, error) {
 		}, nil
 
 	default:
-		// SharedPVC (multi-node) is a v1 concern.
 		return cacheArtifacts{}, fmt.Errorf("cache strategy %q is not supported in v0", strategy)
 	}
 }
@@ -150,6 +153,9 @@ func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infere
 
 	pod := corev1.PodSpec{
 		RestartPolicy: corev1.RestartPolicyOnFailure,
+		NodeSelector:  maps.Clone(rt.Spec.Accelerator.NodeSelector),
+		Tolerations:   append([]corev1.Toleration(nil), rt.Spec.Accelerator.Tolerations...),
+		SchedulerName: rt.Spec.Accelerator.Scheduler.Name,
 		Containers: []corev1.Container{{
 			Name:         "prewarm",
 			Image:        rt.Spec.Container.Image,
@@ -162,13 +168,17 @@ func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infere
 	applyImagePullSecrets(&pod, svc)
 
 	backoff := int32(4)
+	templateMetadata := metav1.ObjectMeta{Labels: SelectorLabels(svc)}
+	if queue := rt.Spec.Accelerator.Scheduler.Queue; queue != "" {
+		templateMetadata.Annotations = map[string]string{volcanoQueueAnnotation: queue}
+	}
 	return &batchv1.Job{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "batch/v1", Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{Name: PrewarmJobName(svc), Namespace: svc.Namespace, Labels: SelectorLabels(svc)},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: &backoff,
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: SelectorLabels(svc)},
+				ObjectMeta: templateMetadata,
 				Spec:       pod,
 			},
 		},

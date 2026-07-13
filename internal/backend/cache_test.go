@@ -151,6 +151,12 @@ func TestSharedPVCNotSupportedYet(t *testing.T) {
 	g.Expect(err).To(HaveOccurred())
 }
 
+func TestBakedImageNotSupportedYet(t *testing.T) {
+	g := NewWithT(t)
+	_, err := backend.BuildDeployment(stubAdapter{}, serviceWithCache("BakedImage", false), runtimeFixture(), model())
+	g.Expect(err).To(MatchError(ContainSubstring("BakedImage")))
+}
+
 func TestPrewarmJob(t *testing.T) {
 	g := NewWithT(t)
 
@@ -172,6 +178,22 @@ func TestPrewarmJob(t *testing.T) {
 	job, err = backend.BuildPrewarmJob(serviceWithCache("None", true), runtimeFixture(), model())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(job).To(BeNil())
+}
+
+func TestPrewarmJobUsesRuntimeScheduling(t *testing.T) {
+	g := NewWithT(t)
+	rt := runtimeFixture()
+	rt.Spec.Accelerator.NodeSelector = map[string]string{"accelerator": "ascend-310p"}
+	rt.Spec.Accelerator.Tolerations = []corev1.Toleration{{Key: "npu", Operator: corev1.TolerationOpExists}}
+	rt.Spec.Accelerator.Scheduler = servingv1alpha1.RuntimeScheduler{Name: "volcano", Queue: "inference"}
+
+	job, err := backend.BuildPrewarmJob(serviceWithCache("HostPath", true), rt, model())
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(job.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "ascend-310p"))
+	g.Expect(job.Spec.Template.Spec.Tolerations).To(HaveLen(1))
+	g.Expect(job.Spec.Template.Spec.SchedulerName).To(Equal("volcano"))
+	g.Expect(job.Spec.Template.Annotations).To(HaveKeyWithValue("scheduling.volcano.sh/queue-name", "inference"))
+	g.Expect(job.Spec.Template.Spec.Containers[0].Resources.Limits).NotTo(HaveKey(corev1.ResourceName("nvidia.com/gpu")))
 }
 
 func TestGracefulDrainWiresPreStopAndGrace(t *testing.T) {

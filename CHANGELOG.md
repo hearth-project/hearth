@@ -18,13 +18,15 @@ All notable changes to this project are documented here. The format is based on
   periods.
 
 ### Changed
+- Runtime and service examples now live under vendor-specific `examples/` directories, with filenames
+  that identify the validated device model instead of using generic Ascend or NVIDIA names.
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
   node-local model data is prepared where the backend can run.
 - `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.
 - The Ascend 910B runtime now invokes `vllm serve` explicitly and uses MindCluster's standard
-  `accelerator=huawei-Ascend910` node label. A dedicated hardware-validation service sample uses a
+  `accelerator=huawei-Ascend910` node label. A dedicated hardware-validation service example uses a
   60-second drain, the shortest tested value that completed a live 910B3 stream without aborting.
-- Ascend 310P samples invoke `vllm serve` explicitly and pin FP16 for the validated 310P3 path.
+- Ascend 310P examples invoke `vllm serve` explicitly and pin FP16 for the validated 310P3 path.
 
 ### Fixed
 - Reject unsupported `BakedImage` cache requests instead of silently rendering them as uncached.

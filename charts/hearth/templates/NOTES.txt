@@ -14,9 +14,9 @@ Prerequisites for full functionality (Hearth degrades gracefully without them):
 
 Try it:
   1. Register a backend:
-       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/main/config/samples/serving_v1alpha1_inferenceruntime.yaml
+       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/main/examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
   2. Deploy a model:
-       kubectl apply -n {{ .Release.Namespace }} -f https://raw.githubusercontent.com/hearth-project/hearth/main/config/samples/serving_v1alpha1_llmservice.yaml
+       kubectl apply -n {{ .Release.Namespace }} -f https://raw.githubusercontent.com/hearth-project/hearth/main/examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml
   3. Watch it:
        kubectl get llmservice -n {{ .Release.Namespace }} -w
 

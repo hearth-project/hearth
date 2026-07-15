@@ -1,0 +1,7 @@
+resources:
+- serving_v1alpha1_inferenceruntime_ascend_910b3.yaml
+- serving_v1alpha1_inferenceruntime_ascend_310p_duo.yaml
+- serving_v1alpha1_inferenceruntime_ascend_310p_pro.yaml
+- serving_v1alpha1_llmservice_ascend_910b3.yaml
+- serving_v1alpha1_llmservice_ascend_310p_duo.yaml
+- serving_v1alpha1_llmservice_ascend_310p_pro.yaml

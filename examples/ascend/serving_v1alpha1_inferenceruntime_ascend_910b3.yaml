@@ -4,19 +4,17 @@ metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: vllm-ascend-310p-pro
-# Validation profile for Huawei Atlas 300I Pro on Ubuntu. vLLM-Ascend does not
-# currently list this product explicitly, so physical validation is required.
+  name: vllm-ascend
+# Ascend 910B3 (Atlas A2). This profile is hardware-validated with CANN 9.0.0
+# and driver 26.0.rc1. For A3 use the -a3 tag; for 310P use a dedicated -310p profile.
 spec:
   family: vllm
   vendor: ascend
-  # Keep the verified 910B runtime (priority 100) ahead of this validation profile
-  # for broad vendor selectors. Validation services pin this runtime by name.
-  priority: 90
+  priority: 100
   container:
-    image: quay.io/ascend/vllm-ascend:v0.22.1rc1-310p
+    image: quay.io/ascend/vllm-ascend:v0.21.0rc1
     args:
-      # The 310P image entrypoint delegates to argv, so include the executable and subcommand.
+      # The image entrypoint delegates to argv, so include the executable and subcommand.
       - vllm
       - serve
       - "{{ .Model.Path }}"
@@ -26,13 +24,13 @@ spec:
       name: http
       containerPort: 8000
   accelerator:
-    # Standard non-mixed, whole-device resource reported by Ascend Device Plugin.
-    resourceName: huawei.com/Ascend310P
+    # device visibility is set by the Ascend device plugin; Hearth only requests the resource
+    resourceName: huawei.com/Ascend910
     sharing:
       supported: false
     nodeSelector:
-      accelerator: huawei-Ascend310P
-      serving.hearth.dev/ascend-product: atlas-300i-pro
+      # Matches the selector in MindCluster's standard Ascend 910 device-plugin manifest.
+      accelerator: huawei-Ascend910
   health:
     readiness:
       httpGet:

@@ -64,7 +64,7 @@ Observed functional results:
   preserved the expected resources.
 
 The run found release-candidate defects that are corrected in this repository: prewarm Pods now
-disable PyTorch device-backend autoload, the 310P runtime invokes `vllm serve` explicitly, the sample
+disable PyTorch device-backend autoload, the 310P runtime invokes `vllm serve` explicitly, the example
 pins FP16, and gateway metrics distinguish a committed SSE `200` from an activation failure. The
 supplied operator image must still be rebuilt from current source: it identified itself as `dev` and
 did not react to `InferenceRuntime` changes until the `LLMService` was touched, although the source
@@ -147,7 +147,7 @@ make install
 ```
 
 If the cluster has no default dynamic StorageClass, set `cache.storageClassName` in both service
-samples before applying them, or use a deliberately prepared HostPath cache.
+examples before applying them, or use a deliberately prepared HostPath cache.
 
 For K3s, configure a separate data disk through `/etc/rancher/k3s/config.yaml`; editing the bundled
 local-path manifest or ConfigMap is not persistent because K3s regenerates it:
@@ -165,8 +165,13 @@ Run each profile separately so its evidence is unambiguous. Set `PROFILE` to `du
 
 ```bash
 PROFILE=duo
-RUNTIME="config/samples/serving_v1alpha1_inferenceruntime_ascend_310p_${PROFILE}.yaml"
-SERVICE_FILE="config/samples/serving_v1alpha1_llmservice_ascend_310p_${PROFILE}.yaml"
+case "$PROFILE" in
+  duo) FILE_PROFILE="310p_duo" ;;
+  pro) FILE_PROFILE="310p_pro" ;;
+  *) echo "PROFILE must be duo or pro" >&2; exit 1 ;;
+esac
+RUNTIME="examples/ascend/serving_v1alpha1_inferenceruntime_ascend_${FILE_PROFILE}.yaml"
+SERVICE_FILE="examples/ascend/serving_v1alpha1_llmservice_ascend_${FILE_PROFILE}.yaml"
 SERVICE="qwen-310p-${PROFILE}-validation"
 
 kubectl apply -f "$RUNTIME"
@@ -204,8 +209,8 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 
 Record idle replicas at zero, the cold request causing `0 -> 1`, Loading-to-Ready status, a complete
 stream ending in `[DONE]`, and the backend returning to zero after the stabilization window. The Duo
-sample permits two replicas; send several concurrent streams and confirm it reaches two Ready Pods
-on distinct devices before returning to zero. Keep the Pro sample at one replica until its physical
+example permits two replicas; send several concurrent streams and confirm it reaches two Ready Pods
+on distinct devices before returning to zero. Keep the Pro example at one replica until its physical
 device topology is recorded.
 
 ## 7. Troubleshooting

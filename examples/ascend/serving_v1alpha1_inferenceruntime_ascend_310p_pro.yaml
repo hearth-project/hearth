@@ -4,9 +4,10 @@ metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: vllm-ascend-310p-duo
-# Hardware-verified profile for Huawei Atlas 300I Duo on Ubuntu. See the 310P
-# validation report for the exact tested environment and image digest.
+  name: vllm-ascend-310p-pro
+# Validation profile for Huawei Atlas 300I Pro with an Ascend 310P device on
+# Ubuntu. vLLM-Ascend does not
+# currently list this product explicitly, so physical validation is required.
 spec:
   family: vllm
   vendor: ascend
@@ -32,7 +33,7 @@ spec:
       supported: false
     nodeSelector:
       accelerator: huawei-Ascend310P
-      serving.hearth.dev/ascend-product: atlas-300i-duo
+      serving.hearth.dev/ascend-product: atlas-300i-pro
   health:
     readiness:
       httpGet:

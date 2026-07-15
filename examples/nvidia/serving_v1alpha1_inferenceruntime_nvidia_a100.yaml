@@ -1,36 +1,30 @@
 apiVersion: serving.hearth.dev/v1alpha1
 kind: InferenceRuntime
+# Hardware-validated on NVIDIA A100. The standard nvidia.com/gpu resource keeps
+# the runtime usable on other vLLM-compatible NVIDIA devices.
 metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: vllm-ascend
-# Ascend 910B (Atlas A2). This profile is hardware-validated on 910B3 with CANN 9.0.0
-# and driver 26.0.rc1. For A3 use the -a3 tag; for 310P use a dedicated -310p profile.
+  name: vllm-nvidia
 spec:
   family: vllm
-  vendor: ascend
+  vendor: nvidia
   priority: 100
   container:
-    image: quay.io/ascend/vllm-ascend:v0.21.0rc1
+    image: vllm/vllm-openai:v0.22.0
+    # args are Go-templated and rendered by the operator (.Model.Path, .Service.Name, ...)
     args:
-      # The image entrypoint delegates to argv, so include the executable and subcommand.
-      - vllm
-      - serve
-      - "{{ .Model.Path }}"
+      - --model={{ .Model.Path }}
       - --served-model-name={{ .Service.Name }}
       - --port=8000
     port:
       name: http
       containerPort: 8000
   accelerator:
-    # device visibility is set by the Ascend device plugin; Hearth only requests the resource
-    resourceName: huawei.com/Ascend910
+    resourceName: nvidia.com/gpu
     sharing:
       supported: false
-    nodeSelector:
-      # Matches the selector in MindCluster's standard Ascend 910 device-plugin manifest.
-      accelerator: huawei-Ascend910
   health:
     readiness:
       httpGet:
@@ -46,7 +40,7 @@ spec:
         path: /health
         port: http
       periodSeconds: 10
-      failureThreshold: 180
+      failureThreshold: 120
   lifecycle:
     terminationGracePeriodSeconds: 120
     preStopDrain: true

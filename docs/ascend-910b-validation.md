@@ -83,7 +83,7 @@ size of the model weights.
 A 15-second drain was not sufficient for this stack. The client received HTTP 200 and `[DONE]`,
 but vLLM ended the generation with `finish_reason: "abort"` after one token. With
 `drainTimeout: 60s`, the repeated deletion test delivered 129 SSE chunks, `[DONE]`, HTTP 200, and
-normal `finish_reason: "length"` in 51.80 seconds. The 910B service sample therefore uses 60 seconds.
+normal `finish_reason: "length"` in 51.80 seconds. The 910B service example therefore uses 60 seconds.
 
 The following recovery paths also passed:
 
@@ -102,11 +102,11 @@ Degraded reasons. Admission rejected `scaling.min > scaling.max` and an unknown 
 
 ## Release-candidate findings
 
-The hardware run found three release-image/sample issues. The sample corrections work immediately;
+The hardware run found three release-image/example issues. The example corrections work immediately;
 the controller corrections require an operator image rebuilt from current source:
 
-1. The old 910B sample supplied only `--model=...` flags. The runtime image entrypoint delegates to
-   argv, so it needs explicit `vllm serve`. The sample now uses that form.
+1. The old 910B example supplied only `--model=...` flags. The runtime image entrypoint delegates to
+   argv, so it needs explicit `vllm serve`. The example now uses that form.
 2. The release operator omitted `TORCH_DEVICE_BACKEND_AUTOLOAD=0` from accelerator-free prewarm
    Pods. ModelScope imported PyTorch, auto-loaded `torch_npu`, and failed on `libascend_hal.so`.
    Current source adds the safeguard; the corrected Job completed without an NPU.
@@ -137,7 +137,7 @@ generated local-path manifest.
 ### 2. Install and verify the device plugin
 
 Use MindCluster's standard non-Volcano Ascend 910 manifest unless the cluster deliberately uses a
-different scheduler mode. Its node selector and the Hearth runtime sample use the same label:
+different scheduler mode. Its node selector and the Hearth runtime example use the same label:
 
 ```bash
 kubectl label node <npu-node> accelerator=huawei-Ascend910 --overwrite
@@ -153,9 +153,9 @@ Install KEDA and Hearth using the normal project instructions, then use a dedica
 
 ```bash
 kubectl create namespace hearth-910b-validation
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime_ascend.yaml
+kubectl apply -f examples/ascend/serving_v1alpha1_inferenceruntime_ascend_910b3.yaml
 kubectl apply -n hearth-910b-validation \
-  -f config/samples/serving_v1alpha1_llmservice_ascend.yaml
+  -f examples/ascend/serving_v1alpha1_llmservice_ascend_910b3.yaml
 kubectl get llmservice,pvc,job,deploy,pod,scaledobject \
   -n hearth-910b-validation -w
 ```

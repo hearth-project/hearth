@@ -1,0 +1,5 @@
+## Append examples of your project ##
+resources:
+- ascend
+- nvidia
+# +kubebuilder:scaffold:manifestskustomizesamples

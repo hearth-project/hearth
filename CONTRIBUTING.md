@@ -28,7 +28,7 @@ side of that line.
 - **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P1/P2** items
   (`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
   and the **community track** (the KEDA external push scaler, #42) are great entry points.
-- **Docs, samples, bug reports, repros** — all welcome, no change too small.
+- **Docs, examples, bug reports, repros** — all welcome, no change too small.
 
 Look for issues labeled **`good first issue`** / **`help wanted`**, or open one to discuss before a
 large change.
@@ -50,8 +50,8 @@ make lint           # golangci-lint (run before every PR)
 ```bash
 make install                 # install CRDs into your current kube-context (e.g. a kind cluster)
 make run                     # run the operator on your host against that context
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
-kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml
+kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
+kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml
 kubectl get llmservice,deploy,svc,scaledobject -w
 ```
 
@@ -79,7 +79,7 @@ This is a [Kubebuilder](https://book.kubebuilder.io/) project. Key paths:
 - `internal/controller/*` — reconcilers.
 - `internal/backend/*` — the multi-backend abstraction (adapters live here).
 - `internal/gateway/*` — the data-plane proxy.
-- `config/samples/*`, `charts/hearth/*` — examples and the Helm chart.
+- `examples/<vendor>/*`, `charts/hearth/*` — hardware-specific examples and the Helm chart.
 
 **Never hand-edit generated files** — `**/zz_generated.*`, `config/crd/bases/*`, `config/rbac/role.yaml`,
 `PROJECT`. After changing API types or RBAC markers, regenerate:

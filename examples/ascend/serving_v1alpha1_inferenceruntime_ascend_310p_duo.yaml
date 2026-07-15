@@ -4,25 +4,36 @@ metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: vllm-nvidia
+  name: vllm-ascend-310p-duo
+# Hardware-verified profile for Huawei Atlas 300I Duo with two Ascend 310P3
+# devices on Ubuntu. See the 310P
+# validation report for the exact tested environment and image digest.
 spec:
   family: vllm
-  vendor: nvidia
-  priority: 100
+  vendor: ascend
+  # Keep the verified 910B runtime (priority 100) ahead of this validation profile
+  # for broad vendor selectors. Validation services pin this runtime by name.
+  priority: 90
   container:
-    image: vllm/vllm-openai:v0.22.0
-    # args are Go-templated and rendered by the operator (.Model.Path, .Service.Name, ...)
+    image: quay.io/ascend/vllm-ascend:v0.22.1rc1-310p
     args:
-      - --model={{ .Model.Path }}
+      # The 310P image entrypoint delegates to argv, so include the executable and subcommand.
+      - vllm
+      - serve
+      - "{{ .Model.Path }}"
       - --served-model-name={{ .Service.Name }}
       - --port=8000
     port:
       name: http
       containerPort: 8000
   accelerator:
-    resourceName: nvidia.com/gpu
+    # Standard non-mixed, whole-device resource reported by Ascend Device Plugin.
+    resourceName: huawei.com/Ascend310P
     sharing:
       supported: false
+    nodeSelector:
+      accelerator: huawei-Ascend310P
+      serving.hearth.dev/ascend-product: atlas-300i-duo
   health:
     readiness:
       httpGet:
@@ -38,7 +49,7 @@ spec:
         path: /health
         port: http
       periodSeconds: 10
-      failureThreshold: 120
+      failureThreshold: 180
   lifecycle:
     terminationGracePeriodSeconds: 120
     preStopDrain: true

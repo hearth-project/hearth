@@ -32,30 +32,30 @@ import (
 	"github.com/hearth-project/hearth/internal/model"
 )
 
-const samplesDir = "../../../config/samples"
+const examplesDir = "../../../examples/ascend"
 
-func loadSample[T any](t *testing.T, name string) *T {
+func loadExample[T any](t *testing.T, name string) *T {
 	t.Helper()
 
-	data, err := os.ReadFile(filepath.Join(samplesDir, name)) //nolint:gosec // test reads a fixed repository fixture
+	data, err := os.ReadFile(filepath.Join(examplesDir, name)) //nolint:gosec // test reads a fixed repository fixture
 	if err != nil {
-		t.Fatalf("read sample %s: %v", name, err)
+		t.Fatalf("read example %s: %v", name, err)
 	}
 	jsonData, err := utilyaml.ToJSON(data)
 	if err != nil {
-		t.Fatalf("convert sample %s to JSON: %v", name, err)
+		t.Fatalf("convert example %s to JSON: %v", name, err)
 	}
 	var out T
 	if err := json.Unmarshal(jsonData, &out); err != nil {
-		t.Fatalf("decode sample %s: %v", name, err)
+		t.Fatalf("decode example %s: %v", name, err)
 	}
 	return &out
 }
 
 func TestAscend910BProfile(t *testing.T) {
 	g := NewWithT(t)
-	rt := loadSample[servingv1alpha1.InferenceRuntime](t, "serving_v1alpha1_inferenceruntime_ascend.yaml")
-	svc := loadSample[servingv1alpha1.LLMService](t, "serving_v1alpha1_llmservice_ascend.yaml")
+	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "serving_v1alpha1_inferenceruntime_ascend_910b3.yaml")
+	svc := loadExample[servingv1alpha1.LLMService](t, "serving_v1alpha1_llmservice_ascend_910b3.yaml")
 
 	g.Expect(rt.Name).To(Equal("vllm-ascend"))
 	g.Expect(rt.Spec.Vendor).To(Equal(ascend.Vendor))
@@ -117,8 +117,8 @@ func TestAscend310PProfiles(t *testing.T) {
 	for _, profile := range profiles {
 		t.Run(profile.name, func(t *testing.T) {
 			g := NewWithT(t)
-			rt := loadSample[servingv1alpha1.InferenceRuntime](t, profile.runtimeFile)
-			svc := loadSample[servingv1alpha1.LLMService](t, profile.serviceFile)
+			rt := loadExample[servingv1alpha1.InferenceRuntime](t, profile.runtimeFile)
+			svc := loadExample[servingv1alpha1.LLMService](t, profile.serviceFile)
 
 			g.Expect(rt.Name).To(Equal(profile.runtimeName))
 			g.Expect(rt.Spec.Vendor).To(Equal(ascend.Vendor))

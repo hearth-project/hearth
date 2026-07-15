@@ -145,8 +145,8 @@ make run
 
 # 3. register a backend + a service
 kubectl create namespace ai
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
-kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml -n ai
+kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
+kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml -n ai
 
 # 4. watch it reconcile (backend pod stays Pending without a GPU — expected)
 kubectl get llmservice,deploy,svc -n ai
@@ -176,8 +176,8 @@ helm install keda kedacore/keda -n keda --create-namespace
 helm install hearth ./charts/hearth -n hearth-system --create-namespace
 
 # 3. register a backend and deploy a model
-kubectl apply -f config/samples/serving_v1alpha1_inferenceruntime.yaml
-kubectl apply -f config/samples/serving_v1alpha1_llmservice.yaml
+kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
+kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml
 kubectl get llmservice -w
 ```
 
@@ -196,7 +196,7 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **`v0.2.0-rc.1` (pre-release)** — Ascend 910B runtime and separate gateway bring-up. A subsequent
   physical 910B3 run completed device-plugin scheduling, single-device `0→1→0`, inference, drain,
   and reboot recovery; the report records the RC-image defects and current source fixes.
-- **v1** — validate multi-device 910B and Atlas 300I Pro, then Moore Threads; complete Volcano/HAMi
+- **v1** — validate multi-device 910B and Atlas 300I Pro; complete Volcano/HAMi
   live validation, `oci://` sources, and shared caching for private delivery. Atlas 300I Duo is
   already scale-to-zero verified.
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.

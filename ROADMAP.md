@@ -71,9 +71,6 @@ anything requiring auth, SLAs, or stability guarantees.
   self-heal, Helm upgrade, and reboot recovery.
 - [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
   the [310P report and runbook](docs/ascend-310p-validation.md).
-- The **Moore Threads (MUSA)** backend (`moorethreads` + `vllm-musa`, MTT S5000) is scaffolded and
-  golden-tested, ready as the second backend.
-
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
   is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi sharing /
   gang scheduling follows.

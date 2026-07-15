@@ -21,7 +21,6 @@ package registry
 import (
 	"github.com/hearth-project/hearth/internal/backend"
 	"github.com/hearth-project/hearth/internal/backend/ascend"
-	"github.com/hearth-project/hearth/internal/backend/moorethreads"
 	"github.com/hearth-project/hearth/internal/backend/nvidia"
 )
 
@@ -30,6 +29,5 @@ func New() *backend.Registry {
 	r := backend.NewRegistry()
 	r.Register(nvidia.New())
 	r.Register(ascend.New())
-	r.Register(moorethreads.New())
 	return r
 }

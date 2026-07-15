@@ -30,11 +30,12 @@ changing contributor workflows.
 | `api/v1alpha1/` | CRD Go types and Kubebuilder markers |
 | `internal/controller/` | `LLMService` and `InferenceRuntime` reconcilers plus envtest suite |
 | `internal/backend/` | Shared workload builders and the vendor-neutral adapter interface |
-| `internal/backend/{nvidia,ascend,moorethreads}/` | Built-in vendor adapters |
+| `internal/backend/{nvidia,ascend}/` | Built-in vendor adapters |
 | `internal/backend/registry/` | Registration of built-in adapters |
 | `internal/gateway/` | Cold-start-aware reverse proxy, backpressure, draining, and metrics |
 | `internal/model/` | Model URI resolution (`hf://`, `modelscope://`, and `pvc://`) |
-| `config/` | Kustomize deployment, generated CRDs/RBAC, samples, and observability assets |
+| `config/` | Kustomize deployment, generated CRDs/RBAC, and observability assets |
+| `examples/{nvidia,ascend}/` | Hardware-specific runtime and service examples |
 | `charts/hearth/` | Manually maintained Helm chart; CRDs are synchronized from `config/crd/bases/` |
 | `test/e2e/` | Isolated Kind manager E2E suite (`e2e` build tag) |
 | `test/scaletozero/` | KEDA + gateway + CPU stub scale-to-zero E2E suite (`e2e` build tag) |
@@ -112,7 +113,7 @@ When adding a backend vendor, update all applicable surfaces:
 1. Add the adapter package and focused rendering tests under `internal/backend/<vendor>/`.
 2. Register it in `internal/backend/registry/registry.go`.
 3. Add the vendor to the API validation enum in `api/v1alpha1/inferenceruntime_types.go`.
-4. Add or update a sample `InferenceRuntime` and its `config/samples/kustomization.yaml` entry.
+4. Add or update an `InferenceRuntime` example and its vendor-specific `examples/*/kustomization.yaml` entry.
 5. Update relevant user documentation and support/validation claims.
 6. Regenerate manifests, deepcopy code, and Helm CRDs.
 
@@ -148,14 +149,14 @@ go test ./test/vllm-stub/...
 
 Controller tests need envtest binaries; use `make test` unless `KUBEBUILDER_ASSETS` is already set.
 
-### APIs and samples
+### APIs and examples
 
 When changing `api/v1alpha1/*_types.go`:
 
 - use Kubernetes API conventions and existing field naming patterns;
 - add precise Kubebuilder validation/default markers;
 - consider backward compatibility because the API is versioned even while `v1alpha1`;
-- update `docs/crd-reference.md`, samples, controller/builders, and tests as applicable;
+- update `docs/crd-reference.md`, examples, controller/builders, and tests as applicable;
 - run the generation commands and normal Go checks.
 
 `InferenceRuntime` is cluster-scoped even if stale scaffold metadata suggests otherwise; the type

@@ -33,7 +33,7 @@ API group `serving.hearth.dev/v1alpha1`.
   `InferenceRuntime`) into the child objects below, via server-side apply, gracefully skipping
   optional CRDs (KEDA / Prometheus) when absent.
 - **Backend abstraction** (`internal/backend`) — a `BackendAdapter` interface + registry. Shared code
-  renders the vLLM pod, accelerator request, and metrics source; thin NVIDIA, Ascend, and Moore Threads adapters
+  renders the vLLM pod, accelerator request, and metrics source; thin NVIDIA and Ascend adapters
   add vendor specifics. Adapters are golden-tested, so they're provable without hardware.
 - **Gateway** (`internal/gateway`) — the data plane: an OpenAI-compatible reverse proxy in front of
   each `LLMService`. It buffers requests during cold start, applies bounded-queue backpressure,
@@ -116,5 +116,5 @@ read-only and skips prewarming. Node-local caches are per-node today;
 `SharedPVC` (RWX) for multi-node is on the roadmap.
 Prewarm Pods inherit the runtime's node selector, tolerations, and scheduler but do not consume an
 accelerator.
-For clusters without a dynamic StorageClass, see the HostPath sample in
-[`config/samples/serving_v1alpha1_llmservice_hostpath.yaml`](../config/samples/serving_v1alpha1_llmservice_hostpath.yaml).
+For clusters without a dynamic StorageClass, see the NVIDIA A100 HostPath example in
+[`examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml`](../examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml).

@@ -65,7 +65,7 @@ controller is passive. Changing a runtime requeues services that pin it or selec
 | Field | Required | Description |
 |---|---|---|
 | `spec.family` | yes | Runtime family; defaults to `vllm`. |
-| `spec.vendor` | yes | Adapter key: `nvidia`, `ascend`, `cambricon`, `hygon`, or `moorethreads`. An adapter must also be registered in code. |
+| `spec.vendor` | yes | Adapter key: `nvidia`, `ascend`, `cambricon`, or `hygon`. An adapter must also be registered in code. |
 | `spec.priority` | no | Tie-breaker within one vendor; higher values win. Vendor order in an `LLMService` selector wins before priority. |
 | `spec.container.image` | yes | Serving image. It must expose an OpenAI-compatible API and the configured metrics endpoint. |
 | `spec.container.args` | no | Go templates rendered with `.Model.Path`, `.Service.Name`, and `.Service.Namespace`. Service `argsOverride` values are appended. |

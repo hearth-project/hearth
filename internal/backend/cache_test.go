@@ -167,6 +167,7 @@ func TestPrewarmJob(t *testing.T) {
 	jc := job.Spec.Template.Spec.Containers[0]
 	g.Expect(jc.Image).To(Equal("vllm/vllm-openai:v0.22.0"))
 	g.Expect(jc.Command).To(ContainElement(ContainSubstring("modelscope")))
+	g.Expect(jc.Env).To(ContainElement(corev1.EnvVar{Name: "TORCH_DEVICE_BACKEND_AUTOLOAD", Value: "0"}))
 	g.Expect(jc.VolumeMounts).To(ContainElement(corev1.VolumeMount{Name: "model-cache", MountPath: "/cache"}))
 
 	// prewarm off => no Job

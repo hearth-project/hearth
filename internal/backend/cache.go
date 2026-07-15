@@ -31,8 +31,9 @@ import (
 const (
 	CacheMountPath = "/cache"
 
-	cacheVolumeName  = "model-cache"
-	defaultCacheSize = "50Gi"
+	cacheVolumeName                  = "model-cache"
+	defaultCacheSize                 = "50Gi"
+	torchDeviceBackendAutoloadEnvVar = "TORCH_DEVICE_BACKEND_AUTOLOAD"
 )
 
 func CachePVCName(svc *servingv1alpha1.LLMService) string { return svc.Name + "-cache" }
@@ -157,10 +158,15 @@ func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.Infere
 		Tolerations:   append([]corev1.Toleration(nil), rt.Spec.Accelerator.Tolerations...),
 		SchedulerName: rt.Spec.Accelerator.Scheduler.Name,
 		Containers: []corev1.Container{{
-			Name:         "prewarm",
-			Image:        rt.Spec.Container.Image,
-			Command:      downloadCommand(m),
-			Env:          append(cacheEnv(), m.Env...),
+			Name:    "prewarm",
+			Image:   rt.Spec.Container.Image,
+			Command: downloadCommand(m),
+			// Prewarming only downloads files. Disable PyTorch's device-backend discovery so
+			// vendor packages cannot require host driver libraries in this accelerator-free Pod.
+			Env: append(append(cacheEnv(), corev1.EnvVar{
+				Name:  torchDeviceBackendAutoloadEnvVar,
+				Value: "0",
+			}), m.Env...),
 			VolumeMounts: []corev1.VolumeMount{*art.mount},
 		}},
 		Volumes: []corev1.Volume{*art.volume},

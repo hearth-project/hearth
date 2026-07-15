@@ -2,15 +2,14 @@
 
 ## Status
 
-Hearth provides **configuration and rendering support** for two Ubuntu-based Ascend 310P targets:
+| Profile | Validation level | Status |
+|---|---|---|
+| Huawei Atlas 300I Duo | Scale-to-zero verified | Full `0 -> 1 -> 2 -> 0` lifecycle passed on physical 310P3 devices on 2026-07-14. |
+| Huawei Atlas 300I Pro | Rendering-tested | Physical validation is still required. |
 
-- Huawei Atlas 300I Duo
-- Huawei Atlas 300I Pro
-
-Neither profile has been validated by Hearth on physical 310P hardware yet. vLLM-Ascend currently
-describes Atlas 300I Duo support as experimental and does not explicitly list Atlas 300I Pro in its
-supported-device list. Do not interpret these manifests or rendering tests as a hardware-support
-claim.
+The Duo result applies only to the environment and image digest recorded below. vLLM-Ascend
+describes 310P support as experimental, and it does not explicitly list Atlas 300I Pro. Do not
+extend the Duo claim to other products or software combinations.
 
 The profiles follow the official [vLLM-Ascend 310P guide](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/hardwares/310p.html),
 [installation guide](https://docs.vllm.ai/projects/ascend/en/main/installation/), and
@@ -27,11 +26,49 @@ Shared image, evidence, and terminology requirements are in the
 | Kubernetes resource | `huawei.com/Ascend310P` |
 | Runtime image | `quay.io/ascend/vllm-ascend:v0.22.1rc1-310p` |
 | Smoke model | `Qwen/Qwen2.5-0.5B-Instruct` from ModelScope |
+| Data type | Explicit `--dtype=float16` |
 | Context limit | Explicit `--max-model-len=2048` |
 | Execution baseline | `--enforce-eager` |
 
 Confirm the image, host driver, firmware, and CANN compatibility against the vLLM-Ascend release
 notes for this exact runtime tag. Do not assume the 910B validation stack is compatible with 310P.
+
+## Atlas 300I Duo result — 2026-07-14
+
+The complete operator, device-plugin, gateway, KEDA, and vLLM path passed on this baseline:
+
+| Item | Observed value |
+|---|---|
+| Server | Atlas 300I Duo; two `310P3` devices, about 44 GB each |
+| Host | Arm64 Ubuntu 26.04 LTS; kernel `6.8.0-134-generic` |
+| Driver / container CANN | `26.0.rc1` / `9.1.0-beta.1` |
+| Kubernetes | K3s `v1.36.2+k3s1`; containerd `2.3.2-k3s2` |
+| Ascend Device Plugin | MindCluster `v7.3.0`, digest `sha256:42fada043e2aa486551dea5d7ed889947fdb7c23d5c34eed2ed72c8c34922876` |
+| KEDA | `2.20.1` |
+| vLLM-Ascend image | `v0.22.1rc1-310p`, digest `sha256:bdd4961179684fde79148c9fb12ec4fa94fafeb575d9cde3827ab4d20a15332f` |
+| Hearth images | Operator `0.2.0-rc.1` digest `sha256:fe6095550ca35be60795020c5a391b9526a3203632449dae9f254c8027fdce56`; gateway digest `sha256:7d5c4cef1b0029c49fd3b639ff075cf8ff3a5386aa6e09600ba6bf9ca808f70d` |
+| Model / cache | `Qwen/Qwen2.5-0.5B-Instruct`; NodeLocalPVC on a dedicated 120 GB ext4 data disk |
+
+Observed functional results:
+
+- A direct `torch_npu` tensor operation passed on an allocated device.
+- A cold streaming request completed through the gateway in `182.04 s`; the same warm request
+  completed in `0.692 s`.
+- Queue demand drove `0 -> 1 -> 2 -> 0`. Both replicas became Ready on distinct devices and served
+  successful requests without container restarts.
+- Reject mode returned `503` with `Retry-After`; a saturated 100-request queue rejected the next
+  five requests with `429`.
+- A 256-token stream completed with `[DONE]` after its serving Pods were deleted, validating drain.
+- Cache data, the driver, device capacity, Hearth, KEDA, and the device plugin recovered across two
+  full host reboots. A no-op apply, operator restart, gateway deletion, and Helm upgrade also
+  preserved the expected resources.
+
+The run found release-candidate defects that are corrected in this repository: prewarm Pods now
+disable PyTorch device-backend autoload, the 310P runtime invokes `vllm serve` explicitly, the sample
+pins FP16, and gateway metrics distinguish a committed SSE `200` from an activation failure. The
+supplied operator image must still be rebuilt from current source: it identified itself as `dev` and
+did not react to `InferenceRuntime` changes until the `LLMService` was touched, although the source
+already contains that watch.
 
 ## 1. Record the environment
 
@@ -112,6 +149,16 @@ make install
 If the cluster has no default dynamic StorageClass, set `cache.storageClassName` in both service
 samples before applying them, or use a deliberately prepared HostPath cache.
 
+For K3s, configure a separate data disk through `/etc/rancher/k3s/config.yaml`; editing the bundled
+local-path manifest or ConfigMap is not persistent because K3s regenerates it:
+
+```yaml
+default-local-storage-path: /var/lib/hearth-data/local-path
+```
+
+Restart K3s, then verify both the live `local-path-config` ConfigMap and a test PVC before deploying
+model weights.
+
 ## 5. Deploy one product profile
 
 Run each profile separately so its evidence is unambiguous. Set `PROFILE` to `duo` or `pro`:
@@ -156,7 +203,10 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 ```
 
 Record idle replicas at zero, the cold request causing `0 -> 1`, Loading-to-Ready status, a complete
-stream ending in `[DONE]`, and the backend returning to zero after the stabilization window.
+stream ending in `[DONE]`, and the backend returning to zero after the stabilization window. The Duo
+sample permits two replicas; send several concurrent streams and confirm it reaches two Ready Pods
+on distinct devices before returning to zero. Keep the Pro sample at one replica until its physical
+device topology is recorded.
 
 ## 7. Troubleshooting
 
@@ -195,6 +245,9 @@ Do not remove `--max-model-len=2048`: the official 310P guide warns that automat
 allocate a quadratic attention mask. Confirm the rendered arguments and NPU ownership before changing
 the model or context limit.
 
+If startup fails with a BF16 operator error, confirm that `--dtype=float16` is present. The validated
+310P3 path does not support the BF16 operator selected by the smoke model's default configuration.
+
 ### Gateway activation timeout
 
 Inspect scheduling, startup, and readiness before increasing `activationTimeout`. A longer timeout
@@ -208,7 +261,8 @@ A product passes physical validation only when:
 - prewarming completes and the backend loads the model;
 - `/health` gates readiness correctly;
 - an OpenAI-compatible streaming request completes through the gateway;
-- KEDA completes an observed `0 -> 1 -> 0` loop; and
+- KEDA completes an observed `0 -> 1 -> configured max -> 0` loop when more than one device is
+  available; and
 - driver, firmware, CANN, device-plugin, image digest, logs, and timings are recorded.
 
-Until then, the product remains a configuration/rendering validation target.
+Products that have not met every criterion remain configuration/rendering validation targets.

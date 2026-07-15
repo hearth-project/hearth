@@ -31,6 +31,10 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
   preview: vLLM-Ascend serves on a real 910B, manifests render correctly, and the gateway data-plane
   is verified on the NPU — only the device-plugin scheduling e2e is pending
   (see [Ascend 910B validation](docs/ascend-910b-validation.md)).
+- **Ascend 310P lifecycle** — Atlas 300I Duo is verified through the device plugin and Hearth
+  gateway, including `0→1→2→0`, backpressure, reject mode, drain, caching, and reboot recovery
+  (see [Ascend 310P validation](docs/ascend-310p-validation.md)). Atlas 300I Pro remains
+  rendering-tested only.
 - **No-GPU CI loop** — the full `0→1→N→0` scale-to-zero e2e (CPU `vllm-stub` + a fake extended
   resource on kind) runs in CI; contributing needs no accelerator.
 
@@ -47,9 +51,11 @@ anything requiring auth, SLAs, or stability guarantees.
 
 ## Path to production
 
-### Now — the v1 milestone: a domestic backend on real hardware
-- **Validate a domestic backend on real hardware.** Target: **Ascend 910B 64GB**. Status as of
-      `v0.2.0-rc.1` (see [Ascend 910B validation](docs/ascend-910b-validation.md)):
+### Now — finish domestic hardware coverage
+
+- **Complete the Ascend 910B loop.** Status as of `v0.2.0-rc.1` (see
+  [Ascend 910B validation](docs/ascend-910b-validation.md)):
+
   - [x] vLLM-Ascend serves on a real 910B (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
   - [x] Operator renders correct 910B manifests (`huawei.com/Ascend910`, driver mounts, cache, probes).
   - [x] Gateway data-plane verified on the NPU (queue signal, passthrough, cold-start keepalive).
@@ -59,15 +65,17 @@ anything requiring auth, SLAs, or stability guarantees.
         unprivileged container, so nested k8s couldn't run). Closing this earns the claim
         *"validated end-to-end on real domestic silicon (Ascend 910B)"*.
 
-  Validate **Ascend 310P** independently on both Atlas 300I Duo and Atlas 300I Pro. The runtime
-  profiles and rendering tests exist, but neither profile has a real-hardware result yet. Follow the
-  [310P runbook](docs/ascend-310p-validation.md) and keep separate evidence for each product.
+- [x] **Atlas 300I Duo.** The physical run passed the integrated `0→1→2→0` lifecycle,
+  streaming inference, bounded-queue backpressure, reject mode, graceful drain, cache persistence,
+  self-heal, Helm upgrade, and reboot recovery.
+- [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
+  the [310P report and runbook](docs/ascend-310p-validation.md).
+- The **Moore Threads (MUSA)** backend (`moorethreads` + `vllm-musa`, MTT S5000) is scaffolded and
+  golden-tested, ready as the second backend.
 
-      The **Moore Threads (MUSA)** backend (`moorethreads` + `vllm-musa`, MTT S5000) is in-repo,
-      scaffolded + golden-tested, ready as the second backend.
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
-      is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi
-      sharing / gang scheduling follows.
+  is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi sharing /
+  gang scheduling follows.
 
 ### P1 — unblock private / enterprise delivery
 - [x] **`imagePullSecrets`** — private-registry support on backend, prewarm, and gateway Pods.
@@ -132,5 +140,6 @@ README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positio
 - **No auth, no multi-tenancy, no quotas.**
 - **Ascend 910B is an experimental preview** — vLLM-Ascend serving, manifest render, and the gateway
   data-plane are verified on a real 910B, but the operator scheduling a pod onto the NPU (device plugin)
-  and the full integrated `0→1→N→0` loop are **not yet run on hardware**. **MLU is manifest-only.**
+  and the full integrated `0→1→N→0` loop are **not yet run on hardware**. Atlas 300I Duo is fully
+  verified for its recorded stack; Atlas 300I Pro and MLU are manifest-only.
 - **`v1alpha1`** — breaking API changes expected before `v1beta1`.

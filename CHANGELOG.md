@@ -9,6 +9,8 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - A shared Ascend hardware-validation guide covering required images, validation levels, evidence,
   and separate 910B, Atlas 300I Duo, and Atlas 300I Pro result sets.
+- Full Atlas 300I Duo hardware evidence for the integrated `0→1→2→0` lifecycle, inference,
+  backpressure, reject mode, drain, cache persistence, self-heal, Helm upgrade, and reboot recovery.
 - Validation bounds for accelerator counts, scaling values, runtime ports, and termination grace
   periods.
 
@@ -16,10 +18,15 @@ All notable changes to this project are documented here. The format is based on
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
   node-local model data is prepared where the backend can run.
 - `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.
+- Ascend 310P samples invoke `vllm serve` explicitly and pin FP16 for the validated 310P3 path.
 
 ### Fixed
 - Reject unsupported `BakedImage` cache requests instead of silently rendering them as uncached.
 - Reject invalid PVC claim names and model paths that could escape the mounted model volume.
+- Prevent accelerator-free prewarm Pods from autoloading PyTorch vendor backends and requiring host
+  driver libraries.
+- Report the committed SSE `200` for keepalive activation timeouts and avoid classifying canceled
+  clients as activation timeouts in gateway metrics.
 
 ## [0.2.0-rc.1] - 2026-06-27
 

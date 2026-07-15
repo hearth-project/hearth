@@ -31,7 +31,7 @@ not reproducible evidence.
 | Profile | Highest completed level | Remaining work |
 |---|---|---|
 | Ascend 910B | Runtime-tested; gateway and manifests also tested separately | Integrated scheduling and the full scale-to-zero loop |
-| Atlas 300I Duo | Rendering-tested | Runtime, integrated, and scale-to-zero validation |
+| Atlas 300I Duo | Scale-to-zero verified on 2026-07-14 | Revalidate each new driver, device-plugin, or runtime-image combination |
 | Atlas 300I Pro | Rendering-tested | Runtime, integrated, and scale-to-zero validation |
 
 Separate component tests do not combine into a higher validation level. For example, a runtime test

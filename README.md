@@ -130,7 +130,7 @@ resource, probes, metrics). Adapter **code** is thin because the differences are
 |---|---|---|---|
 | `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
 | `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 experimental preview — serves on real 910B; render + gateway verified; full scheduling e2e pending ([report](docs/ascend-910b-validation.md)) |
-| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | 🧰 validation configuration for Atlas 300I Duo + Atlas 300I Pro; rendering-tested, physical validation pending ([runbook](docs/ascend-310p-validation.md)) |
+| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | ✅ Atlas 300I Duo scale-to-zero verified on two physical 310P3 devices; Atlas 300I Pro remains rendering-tested ([report and runbook](docs/ascend-310p-validation.md)) |
 | `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
 
 Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).
@@ -199,8 +199,9 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **`v0.2.0-rc.1` (pre-release)** — **Ascend 910B experimental preview**: vLLM-Ascend serving verified
   on real 910B silicon, operator manifests confirmed correct, gateway data-plane verified on the NPU
   ([report](docs/ascend-910b-validation.md)). Device-plugin scheduling e2e still pending.
-- **v1** — domestic backends fully on real hardware: **Ascend 910B and 310P** first, then Moore
-  Threads; Volcano/HAMi live validation; `oci://` sources and shared caching for private delivery.
+- **v1** — complete the remaining Ascend 910B and Atlas 300I Pro hardware loops, then Moore Threads;
+  Volcano/HAMi live validation, `oci://` sources, and shared caching for private delivery. Atlas
+  300I Duo is already scale-to-zero verified.
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today
@@ -210,7 +211,7 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 ## Contributing
 
 Hearth is early and moving fast — contributions, issues, and ideas are very welcome, especially
-**validating the Ascend backend on real NPUs** and the [roadmap](ROADMAP.md)'s "Now"/P1 items. Start with
+**validating the remaining Ascend profiles on real NPUs** and the [roadmap](ROADMAP.md)'s "Now"/P1 items. Start with
 **[CONTRIBUTING.md](CONTRIBUTING.md)** and please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

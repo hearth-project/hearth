@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
   name: vllm-ascend-310p-duo
-# Validation profile for Huawei Atlas 300I Duo on Ubuntu. This profile has rendering
-# coverage but must not be described as hardware-verified until the physical runbook passes.
+# Hardware-verified profile for Huawei Atlas 300I Duo on Ubuntu. See the 310P
+# validation report for the exact tested environment and image digest.
 spec:
   family: vllm
   vendor: ascend
@@ -16,7 +16,10 @@ spec:
   container:
     image: quay.io/ascend/vllm-ascend:v0.22.1rc1-310p
     args:
-      - --model={{ .Model.Path }}
+      # The 310P image entrypoint delegates to argv, so include the executable and subcommand.
+      - vllm
+      - serve
+      - "{{ .Model.Path }}"
       - --served-model-name={{ .Service.Name }}
       - --port=8000
     port:

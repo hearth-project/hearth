@@ -12,6 +12,8 @@ spec:
   runtime:
     name: vllm-ascend-310p-duo
     argsOverride:
+      # 310P3 does not support the BF16 operator path selected from this model's config.
+      - --dtype=float16
       # 310P builds a quadratic attention mask; never rely on automatic context sizing.
       - --max-model-len=2048
       # Establish a conservative smoke-test baseline before graph-mode tuning.
@@ -22,7 +24,7 @@ spec:
     memory: 16Gi
   scaling:
     min: 0
-    max: 1
+    max: 2
     metric: queueDepth
     target: 1
     activationTimeout: 10m

@@ -59,6 +59,7 @@ func TestAscend310PProfiles(t *testing.T) {
 		runtimeName string
 		runtimeFile string
 		serviceFile string
+		maxReplicas int32
 	}{
 		{
 			name:        "Atlas 300I Duo",
@@ -66,6 +67,7 @@ func TestAscend310PProfiles(t *testing.T) {
 			runtimeName: "vllm-ascend-310p-duo",
 			runtimeFile: "serving_v1alpha1_inferenceruntime_ascend_310p_duo.yaml",
 			serviceFile: "serving_v1alpha1_llmservice_ascend_310p_duo.yaml",
+			maxReplicas: 2,
 		},
 		{
 			name:        "Atlas 300I Pro",
@@ -73,6 +75,7 @@ func TestAscend310PProfiles(t *testing.T) {
 			runtimeName: "vllm-ascend-310p-pro",
 			runtimeFile: "serving_v1alpha1_inferenceruntime_ascend_310p_pro.yaml",
 			serviceFile: "serving_v1alpha1_llmservice_ascend_310p_pro.yaml",
+			maxReplicas: 1,
 		},
 	}
 
@@ -88,8 +91,10 @@ func TestAscend310PProfiles(t *testing.T) {
 			g.Expect(rt.Spec.Accelerator.ResourceName).To(Equal("huawei.com/Ascend310P"))
 			g.Expect(rt.Spec.Accelerator.NodeSelector).To(HaveKeyWithValue("accelerator", "huawei-Ascend310P"))
 			g.Expect(rt.Spec.Accelerator.NodeSelector).To(HaveKeyWithValue("serving.hearth.dev/ascend-product", profile.product))
+			g.Expect(rt.Spec.Container.Args[:3]).To(Equal([]string{"vllm", "serve", "{{ .Model.Path }}"}))
 			g.Expect(svc.Spec.Runtime.Name).To(Equal(profile.runtimeName))
-			g.Expect(svc.Spec.Runtime.ArgsOverride).To(ContainElements("--enforce-eager", "--max-model-len=2048"))
+			g.Expect(svc.Spec.Runtime.ArgsOverride).To(ContainElements("--dtype=float16", "--enforce-eager", "--max-model-len=2048"))
+			g.Expect(svc.Spec.Scaling.Max).To(Equal(profile.maxReplicas))
 
 			resolved, err := model.Resolve(svc.Spec.Model)
 			g.Expect(err).NotTo(HaveOccurred())
@@ -97,6 +102,7 @@ func TestAscend310PProfiles(t *testing.T) {
 			g.Expect(err).NotTo(HaveOccurred())
 
 			container := deployment.Spec.Template.Spec.Containers[0]
+			g.Expect(container.Args[:3]).To(Equal([]string{"vllm", "serve", "Qwen/Qwen2.5-0.5B-Instruct"}))
 			g.Expect(container.Resources.Limits).To(HaveKey(corev1.ResourceName("huawei.com/Ascend310P")))
 			g.Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(HaveField("Name", "ascend-driver")))
 		})

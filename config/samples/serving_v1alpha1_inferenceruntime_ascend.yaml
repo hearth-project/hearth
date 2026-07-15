@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
   name: vllm-ascend
-# Ascend 910B (Atlas A2). Image pinned to the vllm-ascend release verified on a real
-# 910B2C (CANN 9.0.0 / driver 26.0.rc1). For A3 use the -a3 tag, for 310P the -310p tag.
+# Ascend 910B (Atlas A2). This profile is hardware-validated on 910B3 with CANN 9.0.0
+# and driver 26.0.rc1. For A3 use the -a3 tag; for 310P use a dedicated -310p profile.
 spec:
   family: vllm
   vendor: ascend
@@ -14,7 +14,10 @@ spec:
   container:
     image: quay.io/ascend/vllm-ascend:v0.21.0rc1
     args:
-      - --model={{ .Model.Path }}
+      # The image entrypoint delegates to argv, so include the executable and subcommand.
+      - vllm
+      - serve
+      - "{{ .Model.Path }}"
       - --served-model-name={{ .Service.Name }}
       - --port=8000
     port:
@@ -26,7 +29,8 @@ spec:
     sharing:
       supported: false
     nodeSelector:
-      accelerator: ascend-910
+      # Matches the selector in MindCluster's standard Ascend 910 device-plugin manifest.
+      accelerator: huawei-Ascend910
   health:
     readiness:
       httpGet:

@@ -52,6 +52,41 @@ func loadSample[T any](t *testing.T, name string) *T {
 	return &out
 }
 
+func TestAscend910BProfile(t *testing.T) {
+	g := NewWithT(t)
+	rt := loadSample[servingv1alpha1.InferenceRuntime](t, "serving_v1alpha1_inferenceruntime_ascend.yaml")
+	svc := loadSample[servingv1alpha1.LLMService](t, "serving_v1alpha1_llmservice_ascend.yaml")
+
+	g.Expect(rt.Name).To(Equal("vllm-ascend"))
+	g.Expect(rt.Spec.Vendor).To(Equal(ascend.Vendor))
+	g.Expect(rt.Spec.Container.Image).To(Equal("quay.io/ascend/vllm-ascend:v0.21.0rc1"))
+	g.Expect(rt.Spec.Container.Args[:3]).To(Equal([]string{"vllm", "serve", "{{ .Model.Path }}"}))
+	g.Expect(rt.Spec.Accelerator.ResourceName).To(Equal("huawei.com/Ascend910"))
+	g.Expect(rt.Spec.Accelerator.NodeSelector).To(HaveKeyWithValue("accelerator", "huawei-Ascend910"))
+	g.Expect(svc.Spec.Runtime.Name).To(Equal(rt.Name))
+	g.Expect(svc.Spec.Scaling.Max).To(Equal(int32(1)))
+	g.Expect(svc.Spec.Scaling.DrainTimeout.Duration.String()).To(Equal("1m0s"))
+	g.Expect(svc.Spec.Cache.Prewarm).To(BeTrue())
+
+	resolved, err := model.Resolve(svc.Spec.Model)
+	g.Expect(err).NotTo(HaveOccurred())
+	deployment, err := backend.BuildDeployment(ascend.New(), svc, rt, resolved)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	container := deployment.Spec.Template.Spec.Containers[0]
+	g.Expect(container.Args[:3]).To(Equal([]string{"vllm", "serve", "Qwen/Qwen2.5-0.5B-Instruct"}))
+	g.Expect(container.Resources.Limits).To(HaveKey(corev1.ResourceName("huawei.com/Ascend910")))
+	g.Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(HaveField("Name", "ascend-driver")))
+
+	prewarm, err := backend.BuildPrewarmJob(svc, rt, resolved)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(prewarm).NotTo(BeNil())
+	g.Expect(prewarm.Spec.Template.Spec.Containers[0].Resources.Limits).NotTo(HaveKey(corev1.ResourceName("huawei.com/Ascend910")))
+	g.Expect(prewarm.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{
+		Name: "TORCH_DEVICE_BACKEND_AUTOLOAD", Value: "0",
+	}))
+}
+
 func TestAscend310PProfiles(t *testing.T) {
 	profiles := []struct {
 		name        string

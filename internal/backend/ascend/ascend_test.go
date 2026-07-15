@@ -36,12 +36,12 @@ func ascendRuntime() *servingv1alpha1.InferenceRuntime {
 			Vendor: "ascend",
 			Container: servingv1alpha1.RuntimeContainer{
 				Image: "quay.io/ascend/vllm-ascend:v0.21.0rc1",
-				Args:  []string{"--model={{ .Model.Path }}", "--served-model-name={{ .Service.Name }}"},
+				Args:  []string{"vllm", "serve", "{{ .Model.Path }}", "--served-model-name={{ .Service.Name }}"},
 				Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
 			},
 			Accelerator: servingv1alpha1.AcceleratorSpec{
 				ResourceName: "huawei.com/Ascend910",
-				NodeSelector: map[string]string{"accelerator": "ascend-910"},
+				NodeSelector: map[string]string{"accelerator": "huawei-Ascend910"},
 			},
 		},
 	}
@@ -70,11 +70,11 @@ func TestSameFrameworkRendersAscend(t *testing.T) {
 
 	c := dep.Spec.Template.Spec.Containers[0]
 	g.Expect(c.Image).To(Equal("quay.io/ascend/vllm-ascend:v0.21.0rc1"))
-	g.Expect(c.Args).To(ContainElement("--model=deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"))
+	g.Expect(c.Args[:3]).To(Equal([]string{"vllm", "serve", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"}))
 
 	// the NPU resource comes from the runtime, not adapter code
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceName("huawei.com/Ascend910")))
-	g.Expect(dep.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "ascend-910"))
+	g.Expect(dep.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "huawei-Ascend910"))
 }
 
 func TestAscendProjectsDriverMounts(t *testing.T) {

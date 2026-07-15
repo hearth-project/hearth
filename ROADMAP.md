@@ -27,9 +27,9 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
 - **Graceful drain** — in-flight streams finish before a scale-down SIGTERM.
 - **Observability** — Prometheus scrapes gateway + vLLM `/metrics` via `ServiceMonitor`.
 - **Packaging** — Helm chart installs operator + RBAC; verified reconciling under chart RBAC.
-- **Multi-backend abstraction** — NVIDIA implemented & run; **Ascend 910B** is an experimental
-  preview: vLLM-Ascend serves on a real 910B, manifests render correctly, and the gateway data-plane
-  is verified on the NPU — only the device-plugin scheduling e2e is pending
+- **Multi-backend abstraction** — NVIDIA implemented and run; **Ascend 910B3** is verified through
+  the device plugin, gateway, KEDA, cache, drain, and reboot recovery on one physical device. The
+  completed topology was `0→1→0`; multi-replica scaling needs a multi-device server
   (see [Ascend 910B validation](docs/ascend-910b-validation.md)).
 - **Ascend 310P lifecycle** — Atlas 300I Duo is verified through the device plugin and Hearth
   gateway, including `0→1→2→0`, backpressure, reject mode, drain, caching, and reboot recovery
@@ -53,17 +53,18 @@ anything requiring auth, SLAs, or stability guarantees.
 
 ### Now — finish domestic hardware coverage
 
-- **Complete the Ascend 910B loop.** Status as of `v0.2.0-rc.1` (see
+- **Complete the Ascend 910B loop.** Status after the 2026-07-15 physical run with the RC images (see
   [Ascend 910B validation](docs/ascend-910b-validation.md)):
 
   - [x] vLLM-Ascend serves on a real 910B (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
   - [x] Operator renders correct 910B manifests (`huawei.com/Ascend910`, driver mounts, cache, probes).
   - [x] Gateway data-plane verified on the NPU (queue signal, passthrough, cold-start keepalive).
   - [x] Runtime image pinned to the verified tag (`vllm-ascend:v0.21.0rc1`).
-  - [ ] **Operator → device plugin → pod scheduled and serving on the NPU**, and the full integrated
-        `0→1→N→0` loop on a real NPU node — needs a schedulable node (the preview box was an
-        unprivileged container, so nested k8s couldn't run). Closing this earns the claim
-        *"validated end-to-end on real domestic silicon (Ascend 910B)"*.
+  - [x] **Operator → device plugin → pod scheduled and serving on the NPU**, including cold
+        `0→1→0`, prewarm/cache, reject mode, backpressure, metrics, drain, self-heal, Helm upgrade,
+        and reboot recovery on a physical single-device 910B3 server.
+  - [ ] Validate `1→N` on a server with more than one schedulable Ascend910 device. Do not infer a
+        multi-replica result from the single-device run.
 
 - [x] **Atlas 300I Duo.** The physical run passed the integrated `0→1→2→0` lifecycle,
   streaming inference, bounded-queue backpressure, reject mode, graceful drain, cache persistence,
@@ -138,8 +139,7 @@ README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positio
 - **Node-local cache is per-node** — replicas on fresh nodes re-download weights (until `SharedPVC`).
 - **`SharedPVC` / `BakedImage` cache strategies and `catalogRef` are not implemented.**
 - **No auth, no multi-tenancy, no quotas.**
-- **Ascend 910B is an experimental preview** — vLLM-Ascend serving, manifest render, and the gateway
-  data-plane are verified on a real 910B, but the operator scheduling a pod onto the NPU (device plugin)
-  and the full integrated `0→1→N→0` loop are **not yet run on hardware**. Atlas 300I Duo is fully
+- **Ascend claims are stack- and topology-specific** — the 910B3 result verifies the integrated
+  single-device `0→1→0` path, not multi-replica scaling or every 910B variant. Atlas 300I Duo is
   verified for its recorded stack; Atlas 300I Pro and MLU are manifest-only.
 - **`v1alpha1`** — breaking API changes expected before `v1beta1`.

@@ -9,6 +9,9 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - A shared Ascend hardware-validation guide covering required images, validation levels, evidence,
   and separate 910B, Atlas 300I Duo, and Atlas 300I Pro result sets.
+- Full physical 910B3 evidence for device-plugin scheduling, single-device `0→1→0`, cold and warm
+  inference, reject mode, bounded-queue backpressure, metrics, drain, self-heal, Helm upgrade, and
+  reboot recovery.
 - Full Atlas 300I Duo hardware evidence for the integrated `0→1→2→0` lifecycle, inference,
   backpressure, reject mode, drain, cache persistence, self-heal, Helm upgrade, and reboot recovery.
 - Validation bounds for accelerator counts, scaling values, runtime ports, and termination grace
@@ -18,6 +21,9 @@ All notable changes to this project are documented here. The format is based on
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
   node-local model data is prepared where the backend can run.
 - `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.
+- The Ascend 910B runtime now invokes `vllm serve` explicitly and uses MindCluster's standard
+  `accelerator=huawei-Ascend910` node label. A dedicated hardware-validation service sample uses a
+  60-second drain, the shortest tested value that completed a live 910B3 stream without aborting.
 - Ascend 310P samples invoke `vllm serve` explicitly and pin FP16 for the validated 310P3 path.
 
 ### Fixed

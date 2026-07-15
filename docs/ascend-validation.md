@@ -10,7 +10,7 @@ commands live in the [910B report](ascend-910b-validation.md) and the
 |---|---|---|
 | vLLM image | `quay.io/ascend/vllm-ascend:v0.21.0rc1` | `quay.io/ascend/vllm-ascend:v0.22.1rc1-310p` |
 | Device resource | `huawei.com/Ascend910` | `huawei.com/Ascend310P` |
-| Node label | `accelerator=ascend-910` | `accelerator=huawei-Ascend310P` plus the Hearth product label |
+| Node label | `accelerator=huawei-Ascend910` | `accelerator=huawei-Ascend310P` plus the Hearth product label |
 | Smoke model | `Qwen/Qwen2.5-0.5B-Instruct` | `Qwen/Qwen2.5-0.5B-Instruct` |
 | Hearth operator | `ghcr.io/hearth-project/hearth:<release>` | `ghcr.io/hearth-project/hearth:<release>` |
 | Hearth gateway | `ghcr.io/hearth-project/hearth-gateway:<release>` | `ghcr.io/hearth-project/hearth-gateway:<release>` |
@@ -30,7 +30,7 @@ not reproducible evidence.
 
 | Profile | Highest completed level | Remaining work |
 |---|---|---|
-| Ascend 910B | Runtime-tested; gateway and manifests also tested separately | Integrated scheduling and the full scale-to-zero loop |
+| Ascend 910B3 | Scale-to-zero verified on one physical device on 2026-07-15 | Revalidate new stacks; test `1→N` on a multi-device server |
 | Atlas 300I Duo | Scale-to-zero verified on 2026-07-14 | Revalidate each new driver, device-plugin, or runtime-image combination |
 | Atlas 300I Pro | Rendering-tested | Runtime, integrated, and scale-to-zero validation |
 
@@ -45,8 +45,9 @@ Use these terms consistently in issues, documentation, and release notes:
 2. **Runtime-tested**: vLLM serves a model on the accelerator outside Hearth's full lifecycle.
 3. **Integrated**: the operator schedules the Pod through the device plugin and inference succeeds
    through the Hearth gateway.
-4. **Scale-to-zero verified**: KEDA and the gateway complete `0 → 1 → N → 0`, including cold-start
-   handling and an in-flight drain.
+4. **Scale-to-zero verified**: KEDA and the gateway complete `0 → 1 → configured maximum → 0`,
+   including cold-start handling and an in-flight drain. State the device count when the maximum is
+   one; that result is not evidence for multi-replica scaling.
 
 Only level 4 supports an end-to-end hardware-validation claim.
 

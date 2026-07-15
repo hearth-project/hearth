@@ -6,7 +6,7 @@ A minimal, composable LLM serving control plane for private Kubernetes clusters.
 
 - [Architecture](architecture.md) — components, the two CRDs, and the scale-to-zero data flow.
 - [Ascend hardware validation](ascend-validation.md) — shared prerequisites, validation levels, and required evidence.
-- [Ascend 910B validation](ascend-910b-validation.md) — real-hardware results and the remaining scheduling step.
+- [Ascend 910B validation](ascend-910b-validation.md) — verified single-device scale-to-zero result, exact stack, defects, and runbook.
 - [Ascend 310P deployment validation](ascend-310p-validation.md) — verified Atlas 300I Duo report and Atlas 300I Pro physical-validation runbook.
 - [CRD reference](crd-reference.md) — field-by-field `LLMService` spec reference.
 - [Observability](observability.md) — Grafana dashboard import steps and gateway metrics.

@@ -20,15 +20,12 @@ Hearth turns "run Qwen / DeepSeek / GLM on my private cluster" into a single `LL
 manifest: declarative deployment, queue-driven autoscaling, and **scale-to-zero**, with
 NVIDIA-vLLM, vLLM-Ascend, and future runtimes as **pluggable backends** behind one API.
 
-> **Status — `v0.2.0-rc.1` (alpha).** The NVIDIA backend and the full scale-to-zero path
-> (gateway + KEDA) are **implemented and verified end-to-end on real NVIDIA GPUs** — cold-start
-> keepalive, graceful drain, model caching/prewarm, 1→N autoscaling, and observability. The
-> **Ascend 910B** backend is now an **experimental / technical preview**: on a real 910B we've
-> verified vLLM-Ascend serves on the NPU, the operator renders correct 910B manifests, and the
-> gateway data-plane works — but the operator scheduling a pod onto an NPU via the device plugin
-> (full integrated scale-to-zero e2e) is **not yet verified** (needs a schedulable NPU node). See the
-> [Ascend 910B validation report](docs/ascend-910b-validation.md). Still `v1alpha1` and **not
-> production-ready** (no auth, no multi-tenancy) — see the **[roadmap](ROADMAP.md)**. ⭐ and follow along.
+> **Status — `v0.2.0-rc.1` (alpha).** NVIDIA is verified end to end, including multi-replica
+> scaling. Ascend is hardware-validated through the device plugin and full Hearth lifecycle on an
+> Atlas 300I Duo (`0→1→2→0`) and a single-device 910B3 (`0→1→0`). The 910B result does not cover
+> multi-replica scaling, and the supplied RC operator image has documented fixes that require a
+> rebuild; see the [910B report](docs/ascend-910b-validation.md). Hearth remains `v1alpha1` and
+> **not production-ready** (no auth or multi-tenancy) — see the **[roadmap](ROADMAP.md)**.
 
 ## Why Hearth
 
@@ -118,8 +115,8 @@ NAME       PHASE          RUNTIME       REPLICAS   AGE
 qwen3-8b   ScaledToZero   vllm-nvidia   0          30s
 ```
 
-The same manifest runs on an Ascend cluster by making `vllm-ascend` the available runtime — no spec
-change. **That portability is the whole point.**
+The same `LLMService` shape runs on Ascend by selecting `vllm-ascend` by name or vendor. The model,
+cache, scaling, and endpoint fields stay the same. **That portability is the whole point.**
 
 ## Multi-backend, by design
 
@@ -129,7 +126,7 @@ resource, probes, metrics). Adapter **code** is thin because the differences are
 | Backend | Engine | Accelerator | v0 status |
 |---|---|---|---|
 | `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
-| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 experimental preview — serves on real 910B; render + gateway verified; full scheduling e2e pending ([report](docs/ascend-910b-validation.md)) |
+| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 hardware-validated preview — single-device 910B3 `0→1→0`, inference, drain, and reboot recovery verified; multi-replica scaling untested ([report](docs/ascend-910b-validation.md)) |
 | `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | ✅ Atlas 300I Duo scale-to-zero verified on two physical 310P3 devices; Atlas 300I Pro remains rendering-tested ([report and runbook](docs/ascend-310p-validation.md)) |
 | `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
 
@@ -196,12 +193,12 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
-- **`v0.2.0-rc.1` (pre-release)** — **Ascend 910B experimental preview**: vLLM-Ascend serving verified
-  on real 910B silicon, operator manifests confirmed correct, gateway data-plane verified on the NPU
-  ([report](docs/ascend-910b-validation.md)). Device-plugin scheduling e2e still pending.
-- **v1** — complete the remaining Ascend 910B and Atlas 300I Pro hardware loops, then Moore Threads;
-  Volcano/HAMi live validation, `oci://` sources, and shared caching for private delivery. Atlas
-  300I Duo is already scale-to-zero verified.
+- **`v0.2.0-rc.1` (pre-release)** — Ascend 910B runtime and separate gateway bring-up. A subsequent
+  physical 910B3 run completed device-plugin scheduling, single-device `0→1→0`, inference, drain,
+  and reboot recovery; the report records the RC-image defects and current source fixes.
+- **v1** — validate multi-device 910B and Atlas 300I Pro, then Moore Threads; complete Volcano/HAMi
+  live validation, `oci://` sources, and shared caching for private delivery. Atlas 300I Duo is
+  already scale-to-zero verified.
 - **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
 
 > **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today

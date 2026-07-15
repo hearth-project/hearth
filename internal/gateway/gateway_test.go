@@ -17,6 +17,7 @@ limitations under the License.
 package gateway_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -207,6 +208,60 @@ func TestKeepaliveStreamsHeartbeatsThenResponse(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	g.Expect(string(body)).To(ContainSubstring(": heartbeat"))
 	g.Expect(string(body)).To(ContainSubstring("ok"))
+}
+
+func TestKeepaliveTimeoutMetricsMatchCommittedResponse(t *testing.T) {
+	g := NewWithT(t)
+	gw, err := gateway.New(gateway.Config{
+		BackendURL:        "http://127.0.0.1:1",
+		MaxQueue:          10,
+		ActivationTimeout: 30 * time.Millisecond,
+		RetryInterval:     5 * time.Millisecond,
+		ColdStartMode:     gateway.ColdStartKeepalive,
+		HeartbeatInterval: 5 * time.Millisecond,
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+
+	request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+		strings.NewReader(`{"stream":true}`))
+	response := httptest.NewRecorder()
+	gw.Handler().ServeHTTP(response, request)
+	g.Expect(response.Code).To(Equal(http.StatusOK))
+	g.Expect(response.Body.String()).To(ContainSubstring("backend activation timeout"))
+
+	metricsRequest := httptest.NewRequest(http.MethodGet, gateway.MetricsPath, nil)
+	metricsResponse := httptest.NewRecorder()
+	gw.Handler().ServeHTTP(metricsResponse, metricsRequest)
+	metricsText := metricsResponse.Body.String()
+	g.Expect(metricsText).To(ContainSubstring(`hearth_gateway_requests_total{code="200"} 1`))
+	g.Expect(metricsText).NotTo(ContainSubstring(`hearth_gateway_requests_total{code="503"}`))
+	g.Expect(metricsText).To(ContainSubstring(`hearth_gateway_rejections_total{reason="activation_timeout"} 1`))
+}
+
+func TestCanceledColdRequestIsNotActivationTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{name: "streaming", body: `{"stream":true}`},
+		{name: "non-streaming", body: `{}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			gw := newGateway(t, "http://127.0.0.1:1", 10, time.Second)
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+				strings.NewReader(tc.body)).WithContext(ctx)
+			response := httptest.NewRecorder()
+			gw.Handler().ServeHTTP(response, req)
+
+			metricsRequest := httptest.NewRequest(http.MethodGet, gateway.MetricsPath, nil)
+			metricsResponse := httptest.NewRecorder()
+			gw.Handler().ServeHTTP(metricsResponse, metricsRequest)
+			g.Expect(metricsResponse.Body.String()).NotTo(ContainSubstring(`reason="activation_timeout"`))
+		})
+	}
 }
 
 func TestRejectModeReturns503AndKeepsDemand(t *testing.T) {

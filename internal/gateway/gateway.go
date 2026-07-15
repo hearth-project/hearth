@@ -126,6 +126,14 @@ type Gateway struct {
 	now         func() time.Time
 }
 
+type activationWaitResult int
+
+const (
+	activationReady activationWaitResult = iota
+	activationTimedOut
+	activationClientClosed
+)
+
 func New(cfg Config) (*Gateway, error) {
 	u, err := url.Parse(cfg.BackendURL)
 	if err != nil {
@@ -204,16 +212,30 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
 		case wantsStream(r):
 			// keepalive: hold the streaming connection open with SSE heartbeats so the
 			// client and intermediate proxies don't time out during the minutes-long load.
-			if !g.holdWithHeartbeat(w, r) {
+			result, streamCommitted := g.holdWithHeartbeat(w, r)
+			if result != activationReady {
+				if streamCommitted {
+					g.m.requests.WithLabelValues("200").Inc()
+				}
+				if result == activationClientClosed {
+					return
+				}
+				if !streamCommitted {
+					g.reject(w, "activation_timeout")
+					return
+				}
 				g.m.rejections.WithLabelValues("activation_timeout").Inc()
-				g.m.requests.WithLabelValues("503").Inc()
 				g.writeStreamError(w)
 				return
 			}
-			committed = true
+			committed = streamCommitted
 		default:
 			// Non-streaming client: hold silently; heartbeats would corrupt a JSON body.
-			if !g.waitForBackend(r.Context()) {
+			result := g.waitForBackend(r.Context())
+			if result == activationClientClosed {
+				return
+			}
+			if result == activationTimedOut {
 				g.reject(w, "activation_timeout")
 				return
 			}
@@ -254,11 +276,15 @@ func (g *Gateway) markDemand() {
 }
 
 // holdWithHeartbeat commits a 200 SSE response and emits keepalive comments until the
-// backend is ready, the request is canceled, or the activation timeout elapses.
-func (g *Gateway) holdWithHeartbeat(w http.ResponseWriter, r *http.Request) bool {
+// backend is ready, the request is canceled, or the activation timeout elapses. The
+// committed result keeps response-code metrics aligned with what the client received.
+func (g *Gateway) holdWithHeartbeat(w http.ResponseWriter, r *http.Request) (activationWaitResult, bool) {
+	if r.Context().Err() != nil {
+		return activationClientClosed, false
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		return g.waitForBackend(r.Context())
+		return g.waitForBackend(r.Context()), false
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
@@ -272,21 +298,21 @@ func (g *Gateway) holdWithHeartbeat(w http.ResponseWriter, r *http.Request) bool
 	lastBeat := g.now()
 	for {
 		if g.backendReady(ctx) {
-			return true
+			return activationReady, true
 		}
 		if g.now().After(deadline) {
-			return false
+			return activationTimedOut, true
 		}
 		if g.now().Sub(lastBeat) >= g.cfg.HeartbeatInterval {
 			if _, err := io.WriteString(w, ": heartbeat\n\n"); err != nil {
-				return false
+				return activationClientClosed, true
 			}
 			flusher.Flush()
 			lastBeat = g.now()
 		}
 		select {
 		case <-ctx.Done():
-			return false
+			return activationClientClosed, true
 		case <-time.After(g.cfg.RetryInterval):
 		}
 	}
@@ -335,18 +361,21 @@ func (c *committedWriter) Flush() {
 
 // waitForBackend blocks until the backend is ready, the request is canceled, or the
 // activation timeout elapses (cold-start hold).
-func (g *Gateway) waitForBackend(ctx context.Context) bool {
+func (g *Gateway) waitForBackend(ctx context.Context) activationWaitResult {
 	deadline := g.now().Add(g.cfg.ActivationTimeout)
 	for {
+		if ctx.Err() != nil {
+			return activationClientClosed
+		}
 		if g.backendReady(ctx) {
-			return true
+			return activationReady
 		}
 		if g.now().After(deadline) {
-			return false
+			return activationTimedOut
 		}
 		select {
 		case <-ctx.Done():
-			return false
+			return activationClientClosed
 		case <-time.After(g.cfg.RetryInterval):
 		}
 	}

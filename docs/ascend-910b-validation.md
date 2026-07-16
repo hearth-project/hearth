@@ -153,9 +153,7 @@ Install KEDA and Hearth using the normal project instructions, then use a dedica
 
 ```bash
 kubectl create namespace hearth-910b-validation
-kubectl apply -f examples/ascend/serving_v1alpha1_inferenceruntime_ascend_910b3.yaml
-kubectl apply -n hearth-910b-validation \
-  -f examples/ascend/serving_v1alpha1_llmservice_ascend_910b3.yaml
+kubectl apply -k examples/ascend/910b3 -n hearth-910b-validation
 kubectl get llmservice,pvc,job,deploy,pod,scaledobject \
   -n hearth-910b-validation -w
 ```

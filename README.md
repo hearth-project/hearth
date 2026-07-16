@@ -145,8 +145,7 @@ make run
 
 # 3. register a backend + a service
 kubectl create namespace ai
-kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
-kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml -n ai
+kubectl apply -k examples/nvidia/a100 -n ai
 
 # 4. watch it reconcile (backend pod stays Pending without a GPU — expected)
 kubectl get llmservice,deploy,svc -n ai
@@ -176,8 +175,7 @@ helm install keda kedacore/keda -n keda --create-namespace
 helm install hearth ./charts/hearth -n hearth-system --create-namespace
 
 # 3. register a backend and deploy a model
-kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
-kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml
+kubectl apply -k examples/nvidia/a100
 kubectl get llmservice -w
 ```
 

@@ -35,7 +35,7 @@ changing contributor workflows.
 | `internal/gateway/` | Cold-start-aware reverse proxy, backpressure, draining, and metrics |
 | `internal/model/` | Model URI resolution (`hf://`, `modelscope://`, and `pvc://`) |
 | `config/` | Kustomize deployment, generated CRDs/RBAC, and observability assets |
-| `examples/{nvidia,ascend}/` | Hardware-specific runtime and service examples |
+| `examples/<vendor>/<device>/` | Independently deployable hardware-specific profiles |
 | `charts/hearth/` | Manually maintained Helm chart; CRDs are synchronized from `config/crd/bases/` |
 | `test/e2e/` | Isolated Kind manager E2E suite (`e2e` build tag) |
 | `test/scaletozero/` | KEDA + gateway + CPU stub scale-to-zero E2E suite (`e2e` build tag) |
@@ -113,7 +113,8 @@ When adding a backend vendor, update all applicable surfaces:
 1. Add the adapter package and focused rendering tests under `internal/backend/<vendor>/`.
 2. Register it in `internal/backend/registry/registry.go`.
 3. Add the vendor to the API validation enum in `api/v1alpha1/inferenceruntime_types.go`.
-4. Add or update an `InferenceRuntime` example and its vendor-specific `examples/*/kustomization.yaml` entry.
+4. Add or update an `InferenceRuntime` example and its device-specific
+   `examples/<vendor>/<device>/kustomization.yaml` entry.
 5. Update relevant user documentation and support/validation claims.
 6. Regenerate manifests, deepcopy code, and Helm CRDs.
 

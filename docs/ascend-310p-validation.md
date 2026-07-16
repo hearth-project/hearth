@@ -166,16 +166,13 @@ Run each profile separately so its evidence is unambiguous. Set `PROFILE` to `du
 ```bash
 PROFILE=duo
 case "$PROFILE" in
-  duo) FILE_PROFILE="310p_duo" ;;
-  pro) FILE_PROFILE="310p_pro" ;;
+  duo) PROFILE_DIR="310p-duo" ;;
+  pro) PROFILE_DIR="310p-pro" ;;
   *) echo "PROFILE must be duo or pro" >&2; exit 1 ;;
 esac
-RUNTIME="examples/ascend/serving_v1alpha1_inferenceruntime_ascend_${FILE_PROFILE}.yaml"
-SERVICE_FILE="examples/ascend/serving_v1alpha1_llmservice_ascend_${FILE_PROFILE}.yaml"
 SERVICE="qwen-310p-${PROFILE}-validation"
 
-kubectl apply -f "$RUNTIME"
-kubectl apply -n hearth-310p-validation -f "$SERVICE_FILE"
+kubectl apply -k "examples/ascend/${PROFILE_DIR}" -n hearth-310p-validation
 kubectl get llmservice,pvc,job,deploy,pod -n hearth-310p-validation -w
 ```
 

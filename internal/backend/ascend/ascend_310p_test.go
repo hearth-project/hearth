@@ -54,8 +54,8 @@ func loadExample[T any](t *testing.T, name string) *T {
 
 func TestAscend910BProfile(t *testing.T) {
 	g := NewWithT(t)
-	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "serving_v1alpha1_inferenceruntime_ascend_910b3.yaml")
-	svc := loadExample[servingv1alpha1.LLMService](t, "serving_v1alpha1_llmservice_ascend_910b3.yaml")
+	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "910b3/serving_v1alpha1_inferenceruntime_ascend_910b3.yaml")
+	svc := loadExample[servingv1alpha1.LLMService](t, "910b3/serving_v1alpha1_llmservice_ascend_910b3.yaml")
 
 	g.Expect(rt.Name).To(Equal("vllm-ascend"))
 	g.Expect(rt.Spec.Vendor).To(Equal(ascend.Vendor))
@@ -100,16 +100,16 @@ func TestAscend310PProfiles(t *testing.T) {
 			name:        "Atlas 300I Duo",
 			product:     "atlas-300i-duo",
 			runtimeName: "vllm-ascend-310p-duo",
-			runtimeFile: "serving_v1alpha1_inferenceruntime_ascend_310p_duo.yaml",
-			serviceFile: "serving_v1alpha1_llmservice_ascend_310p_duo.yaml",
+			runtimeFile: "310p-duo/serving_v1alpha1_inferenceruntime_ascend_310p_duo.yaml",
+			serviceFile: "310p-duo/serving_v1alpha1_llmservice_ascend_310p_duo.yaml",
 			maxReplicas: 2,
 		},
 		{
 			name:        "Atlas 300I Pro",
 			product:     "atlas-300i-pro",
 			runtimeName: "vllm-ascend-310p-pro",
-			runtimeFile: "serving_v1alpha1_inferenceruntime_ascend_310p_pro.yaml",
-			serviceFile: "serving_v1alpha1_llmservice_ascend_310p_pro.yaml",
+			runtimeFile: "310p-pro/serving_v1alpha1_inferenceruntime_ascend_310p_pro.yaml",
+			serviceFile: "310p-pro/serving_v1alpha1_llmservice_ascend_310p_pro.yaml",
 			maxReplicas: 1,
 		},
 	}

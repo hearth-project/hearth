@@ -117,4 +117,4 @@ read-only and skips prewarming. Node-local caches are per-node today;
 Prewarm Pods inherit the runtime's node selector, tolerations, and scheduler but do not consume an
 accelerator.
 For clusters without a dynamic StorageClass, see the NVIDIA A100 HostPath example in
-[`examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml`](../examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml).
+[`examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml`](../examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml).

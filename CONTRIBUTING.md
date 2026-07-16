@@ -50,8 +50,7 @@ make lint           # golangci-lint (run before every PR)
 ```bash
 make install                 # install CRDs into your current kube-context (e.g. a kind cluster)
 make run                     # run the operator on your host against that context
-kubectl apply -f examples/nvidia/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
-kubectl apply -f examples/nvidia/serving_v1alpha1_llmservice_nvidia_a100.yaml
+kubectl apply -k examples/nvidia/a100
 kubectl get llmservice,deploy,svc,scaledobject -w
 ```
 

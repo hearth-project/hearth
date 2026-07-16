@@ -18,8 +18,8 @@ All notable changes to this project are documented here. The format is based on
   periods.
 
 ### Changed
-- Runtime and service examples now live under vendor-specific `examples/` directories, with filenames
-  that identify the validated device model instead of using generic Ascend or NVIDIA names.
+- Runtime and service examples now live in independently deployable, vendor/device-specific
+  `examples/` directories, with filenames that identify the validated device model.
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
   node-local model data is prepared where the backend can run.
 - `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.

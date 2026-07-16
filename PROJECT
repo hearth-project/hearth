@@ -15,16 +15,15 @@ resources:
   controller: true
   domain: hearth.dev
   group: serving
-  kind: InferenceRuntime
+  kind: LLMService
   path: github.com/hearth-project/hearth/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
-    namespaced: true
   controller: true
   domain: hearth.dev
   group: serving
-  kind: LLMService
+  kind: InferenceRuntime
   path: github.com/hearth-project/hearth/api/v1alpha1
   version: v1alpha1
 version: "3"

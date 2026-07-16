@@ -28,9 +28,9 @@ The default NVIDIA profile uses `NodeLocalPVC`. On a cluster without a dynamic S
 the A100 runtime and HostPath service explicitly instead:
 
 ```bash
-kubectl apply -f examples/nvidia/a100/serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
+kubectl apply -f examples/nvidia/a100/serving_v1alpha1_inferenceruntime_nvidia.yaml
 kubectl apply -n ai \
-  -f examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml
+  -f examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml
 ```
 
 ## Optional observability

@@ -74,9 +74,10 @@ size of the model weights.
 - With a five-second activation timeout, 105 concurrent cold requests produced exactly 100
   activation-timeout 503 responses and five queue-full 429 responses. The matching gateway
   counters were present.
-- Prometheus Operator was intentionally absent. Hearth logged that it skipped `ServiceMonitor`
-  creation and continued reconciling, so optional-CRD behavior passed; Prometheus Operator
-  integration itself was not tested.
+- Prometheus Operator was intentionally absent. The tested pre-decoupling build logged that it
+  skipped `ServiceMonitor` creation and continued reconciling. Current Hearth releases leave all
+  Prometheus resources to the independent observability examples; integration itself was not
+  tested on this server.
 
 ### Drain and recovery
 
@@ -181,7 +182,7 @@ the configured maximum and prove distinct devices before making a multi-replica 
 ## Remaining bounds
 
 - Multi-replica scaling was not testable on the one-device server.
-- Volcano, HAMi sharing, and Prometheus Operator were not installed; only their optional boundaries
+- Volcano, HAMi sharing, and Prometheus Operator were not installed; only the scheduler boundaries
   or rendered contracts were checked.
 - The exact RC image, driver, firmware, kernel, and device-plugin combination is the evidence unit.
   Revalidate after changing any of them.

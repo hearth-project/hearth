@@ -1,20 +1,55 @@
 # Observability
 
 Hearth exposes Prometheus metrics from both the always-on gateway and the selected backend runtime.
-The bundled Grafana dashboard at [`config/grafana/hearth-overview.json`](../config/grafana/hearth-overview.json)
-visualizes queue depth, request outcomes, cold-start wait, and vLLM runtime signals.
+It does not install or reconcile Prometheus, Grafana, or Prometheus Operator resources. Monitoring
+can therefore be deployed, replaced, or removed without changing the serving control plane.
+
+The generated gateway and backend Services expose a named `http` port and carry both of these
+stable discovery labels:
+
+```text
+app.kubernetes.io/managed-by=hearth
+serving.hearth.dev/llmservice=<llmservice-name>
+```
+
+## Install the optional ServiceMonitor
+
+The independent [`examples/observability/prometheus`](../examples/observability/prometheus) profile
+selects both Services in one workload namespace and scrapes `/metrics` every 15 seconds. Install the
+Prometheus Operator separately, then apply the profile once in each namespace containing
+`LLMService` objects:
+
+```bash
+kubectl apply -k examples/observability/prometheus -n ai
+```
+
+The Prometheus instance must be configured to discover `ServiceMonitor` objects in that namespace
+and accept the profile's labels. The example matches the bundled runtimes, which expose metrics at
+`/metrics`; customize it for a runtime that uses a different path. Hearth serving and autoscaling
+continue normally when the profile or Prometheus Operator is absent.
 
 ## Import the Grafana dashboard
 
 1. Open Grafana and go to **Dashboards** > **New** > **Import**.
-2. Upload or paste [`config/grafana/hearth-overview.json`](../config/grafana/hearth-overview.json).
+2. Upload or paste
+   [`examples/observability/grafana/hearth-overview.json`](../examples/observability/grafana/hearth-overview.json).
 3. Select the Prometheus data source for the dashboard's `DS_PROMETHEUS` input.
 4. Import the dashboard.
 
 The dashboard expects Prometheus to scrape Hearth gateway metrics and the backend vLLM `/metrics`
-endpoint. When the Prometheus Operator CRD is installed, Hearth renders a `ServiceMonitor` for each
-`LLMService` that selects both the gateway and backend services with
-`serving.hearth.dev/llmservice=<llmservice-name>` and scrapes their shared `http` port at `/metrics`.
+endpoint through the optional discovery configuration above.
+
+## Remove legacy controller-owned monitors
+
+Hearth versions before monitoring was decoupled created one `ServiceMonitor` per `LLMService`.
+Those resources retain owner references and disappear when their service is deleted, but an upgrade
+does not otherwise remove them. Delete legacy monitors when adopting the independent profile to
+avoid duplicate scrape targets:
+
+```bash
+kubectl delete servicemonitors.monitoring.coreos.com -A \
+  -l 'app.kubernetes.io/managed-by=hearth,serving.hearth.dev/llmservice'
+```
 
 ## Gateway metrics
 

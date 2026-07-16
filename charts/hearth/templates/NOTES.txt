@@ -6,11 +6,13 @@ Verify the operator deployment:
 The operator deploys a data-plane gateway per LLMService using:
   {{ include "hearth.gatewayImage" . }}
 
-Prerequisites for full functionality (Hearth degrades gracefully without them):
+Prerequisite for scale-to-zero (Hearth degrades gracefully without it):
   - KEDA (required for scale-to-zero / autoscaling):
       helm repo add kedacore https://kedacore.github.io/charts
       helm install keda kedacore/keda -n keda --create-namespace
-  - Prometheus Operator (optional, for the ServiceMonitor + dashboard).
+
+Prometheus and Grafana are independent, opt-in integrations. Hearth does not
+create their resources; see examples/observability in the project repository.
 
 Try it:
   1. Register a backend:

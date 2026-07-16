@@ -18,6 +18,9 @@ All notable changes to this project are documented here. The format is based on
   periods.
 
 ### Changed
+- Prometheus Operator resources and RBAC are decoupled from core reconciliation. Hearth now exposes
+  stable metrics discovery labels while optional `ServiceMonitor` and Grafana assets live under
+  `examples/observability/`.
 - Runtime and service examples now live in independently deployable, vendor/device-specific
   `examples/` directories, with filenames that identify the validated device model.
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so

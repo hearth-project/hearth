@@ -9,7 +9,7 @@ A minimal, composable LLM serving control plane for private Kubernetes clusters.
 - [Ascend 910B validation](ascend-910b-validation.md) — verified single-device scale-to-zero result, exact stack, defects, and runbook.
 - [Ascend 310P deployment validation](ascend-310p-validation.md) — verified Atlas 300I Duo report and Atlas 300I Pro physical-validation runbook.
 - [CRD reference](crd-reference.md) — field-by-field `LLMService` spec reference.
-- [Observability](observability.md) — Grafana dashboard import steps and gateway metrics.
+- [Observability](observability.md) — optional Prometheus discovery, Grafana import, and gateway metrics.
 - [Roadmap](../ROADMAP.md) — what's verified, and the prioritized path to production.
 - [Contributing](../CONTRIBUTING.md) — dev setup, the build/test loop, and how to add a backend.
 - [Developing without a GPU](no-gpu-development.md) — the `vllm-stub` and the no-hardware test loop.

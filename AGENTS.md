@@ -34,8 +34,9 @@ changing contributor workflows.
 | `internal/backend/registry/` | Registration of built-in adapters |
 | `internal/gateway/` | Cold-start-aware reverse proxy, backpressure, draining, and metrics |
 | `internal/model/` | Model URI resolution (`hf://`, `modelscope://`, and `pvc://`) |
-| `config/` | Kustomize deployment, generated CRDs/RBAC, and observability assets |
+| `config/` | Kustomize deployment and generated CRDs/RBAC |
 | `examples/<vendor>/<device>/` | Independently deployable hardware-specific profiles |
+| `examples/observability/` | Optional Prometheus and Grafana integration assets |
 | `charts/hearth/` | Manually maintained Helm chart; CRDs are synchronized from `config/crd/bases/` |
 | `test/e2e/` | Isolated Kind manager E2E suite (`e2e` build tag) |
 | `test/scaletozero/` | KEDA + gateway + CPU stub scale-to-zero E2E suite (`e2e` build tag) |
@@ -85,8 +86,7 @@ One `LLMService` normally reconciles to:
 - a backend Deployment and Service;
 - a gateway Deployment and public Service;
 - an optional cache PVC and prewarm Job;
-- an optional KEDA `ScaledObject`;
-- an optional Prometheus Operator `ServiceMonitor`.
+- an optional KEDA `ScaledObject`.
 
 Preserve these patterns:
 
@@ -95,8 +95,10 @@ Preserve these patterns:
   references.
 - Cache PVCs and prewarm Jobs contain immutable fields and are created once rather than updated in
   place. Understand replacement and ownership behavior before changing them.
-- Missing KEDA or Prometheus CRDs are supported. Optional-resource apply must continue to skip
-  `NoMatch` errors rather than making those operators mandatory.
+- A missing KEDA CRD is supported. Optional-resource apply must continue to skip `NoMatch` errors
+  rather than making KEDA mandatory.
+- Keep monitoring lifecycle outside the core reconciler. Hearth exposes metrics and stable Service
+  labels; optional Prometheus Operator resources belong under `examples/observability/`.
 - Watch owned Kubernetes resources with controller-runtime rather than relying on periodic
   requeues.
 - Update status only when it changed. Use `metav1.Condition` and set `ObservedGeneration`.
@@ -219,7 +221,8 @@ cluster, while `make test-scale-e2e` expects the cluster and KEDA to exist alrea
 - Log messages start with a capital letter, do not end with punctuation, name the object or action,
   and use past tense for failures (for example, `"Failed to create Deployment"`).
 - Follow existing naming and labels, especially `serving.hearth.dev/*` and
-  `app.kubernetes.io/*` contracts used by Services, Deployments, KEDA, and ServiceMonitor selectors.
+  `app.kubernetes.io/*` contracts used by Services, Deployments, KEDA, and optional external
+  metrics discovery.
 - Do not add dependencies when Kubernetes unstructured objects or the standard library already
   match the established approach.
 - When asked to commit, use a focused Conventional Commit subject and include DCO sign-off with

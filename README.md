@@ -36,8 +36,8 @@ Hearth focuses on the smaller end: serving a few open-source LLMs well on a few 
 composing with the Kubernetes infrastructure already in the cluster.
 
 - **One user-facing CRD + KEDA.** No router fleet, no webhook suite, no new autoscaler to learn —
-  if KEDA runs on your cluster, you're most of the way there. Degrades gracefully when
-  KEDA/Prometheus are absent.
+  if KEDA runs on your cluster, you're most of the way there. Degrades gracefully when KEDA is
+  absent; Prometheus and Grafana are completely independent, opt-in integrations.
 - **Scale-to-zero is the center of gravity.** Idle models hold **zero** accelerators; a small
   gateway buffers the cold-start request and KEDA wakes the backend.
 - **Vendor-neutral, domestic-silicon-friendly.** The same manifest runs on NVIDIA or Ascend;
@@ -162,8 +162,9 @@ with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
 > `ghcr.io/hearth-project`, so install is one command — no building required. Still alpha and **not
 > production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
 
-Hearth needs **KEDA** for scale-to-zero (and optionally the **Prometheus Operator** for the
-ServiceMonitor + dashboard — Hearth degrades gracefully without it).
+Hearth needs **KEDA** for scale-to-zero. Monitoring is independent: Hearth exposes metrics and
+stable discovery labels but never installs or reconciles Prometheus or Grafana resources. See the
+optional [`examples/observability`](examples/observability) package.
 
 ```bash
 # 1. KEDA (required for autoscaling / scale-to-zero)

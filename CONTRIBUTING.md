@@ -78,7 +78,9 @@ This is a [Kubebuilder](https://book.kubebuilder.io/) project. Key paths:
 - `internal/controller/*` — reconcilers.
 - `internal/backend/*` — the multi-backend abstraction (adapters live here).
 - `internal/gateway/*` — the data-plane proxy.
-- `examples/<vendor>/*`, `charts/hearth/*` — hardware-specific examples and the Helm chart.
+- `examples/<vendor>/<device>/*` — independently deployable hardware-specific profiles.
+- `examples/observability/*` — optional monitoring integrations, kept outside core reconciliation.
+- `charts/hearth/*` — the Helm chart.
 
 **Never hand-edit generated files** — `**/zz_generated.*`, `config/crd/bases/*`, `config/rbac/role.yaml`,
 `PROJECT`. After changing API types or RBAC markers, regenerate:

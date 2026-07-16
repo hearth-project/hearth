@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/managed-by: kustomize
+  name: hearth-llmservices
+# namespaceSelector is intentionally omitted: install this object in each
+# LLMService namespace so discovery stays namespace-scoped.
+spec:
+  endpoints:
+    - interval: 15s
+      path: /metrics
+      port: http
+  selector:
+    matchLabels:
+      app.kubernetes.io/managed-by: hearth
+    matchExpressions:
+      - key: serving.hearth.dev/llmservice
+        operator: Exists

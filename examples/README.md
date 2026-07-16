@@ -1,4 +1,6 @@
-# Device profiles
+# Examples
+
+## Device profiles
 
 Each directory is an independently deployable `InferenceRuntime` and `LLMService` pair for one
 accelerator model. Apply only the profile that matches the devices advertised by your Kubernetes
@@ -30,3 +32,8 @@ kubectl apply -f examples/nvidia/a100/serving_v1alpha1_inferenceruntime_nvidia_a
 kubectl apply -n ai \
   -f examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml
 ```
+
+## Optional observability
+
+Hearth exposes metrics but does not create Prometheus or Grafana resources. The independent
+[`observability`](observability) package contains an opt-in `ServiceMonitor` and dashboard.

@@ -30,8 +30,8 @@ API group `serving.hearth.dev/v1alpha1`.
 ## Components
 
 - **Operator / controllers** (`internal/controller`) — reconcile an `LLMService` (+ its
-  `InferenceRuntime`) into the child objects below, via server-side apply, gracefully skipping
-  optional CRDs (KEDA / Prometheus) when absent.
+  `InferenceRuntime`) into the child objects below via server-side apply, gracefully skipping the
+  optional KEDA CRD when absent.
 - **Backend abstraction** (`internal/backend`) — a `BackendAdapter` interface + registry. Shared code
   renders the vLLM pod, accelerator request, and metrics source; thin NVIDIA and Ascend adapters
   add vendor specifics. Adapters are golden-tested, so they're provable without hardware.
@@ -44,7 +44,7 @@ API group `serving.hearth.dev/v1alpha1`.
 
 For one `LLMService`, the operator renders: a vLLM **Deployment** (it does *not* set `replicas` —
 KEDA owns `0..N`), a backend **Service**, a **gateway** Deployment + Service, a model **cache**
-(PVC/HostPath) + optional **prewarm Job**, a KEDA **ScaledObject**, and a **ServiceMonitor**.
+(PVC/HostPath) + optional **prewarm Job**, and a KEDA **ScaledObject**.
 
 ```mermaid
 flowchart TD
@@ -54,7 +54,6 @@ flowchart TD
   op --> gwd["Gateway Deployment + Service"]
   op --> cache["Model cache (PVC/HostPath)<br/>+ optional prewarm Job"]
   op --> so["KEDA ScaledObject"]
-  op --> sm["ServiceMonitor"]
 ```
 
 ## Scale-to-zero data flow
@@ -104,8 +103,10 @@ flowchart LR
 
 ## Observability
 
-vLLM and the gateway both expose Prometheus `/metrics`; a `ServiceMonitor` selects both, and a
-Grafana dashboard surfaces queue depth, replicas, cold-starts, and request outcomes.
+vLLM and the gateway expose `/metrics` through Services with a stable `http` port and
+`serving.hearth.dev/llmservice` discovery label. Hearth does not install or reconcile Prometheus
+Operator resources. The independent [`examples/observability`](../examples/observability) package
+provides an opt-in `ServiceMonitor` and Grafana dashboard.
 
 ## Caching
 

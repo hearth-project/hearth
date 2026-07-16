@@ -14,25 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package utils
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
-	"time"
 )
 
-func TestConfigFromEnvParsesAndDefaults(t *testing.T) {
-	t.Setenv("STUB_STARTUP_DELAY", "15s")
-	t.Setenv("STUB_TOKEN_COUNT", "20")
-
-	cfg := ConfigFromEnv()
-	if cfg.StartupDelay != 15*time.Second {
-		t.Fatalf("StartupDelay: want 15s, got %v", cfg.StartupDelay)
+func TestGetProjectDir(t *testing.T) {
+	dir, err := GetProjectDir()
+	if err != nil {
+		t.Fatal(err)
 	}
-	if cfg.TokenCount != 20 {
-		t.Fatalf("TokenCount: want 20, got %d", cfg.TokenCount)
-	}
-	if cfg.TokenDelay != 50*time.Millisecond {
-		t.Fatalf("TokenDelay default: want 50ms, got %v", cfg.TokenDelay)
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		t.Fatalf("repository root %q: %v", dir, err)
 	}
 }

@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Command vllm-stub is a CPU-only fake of a vLLM OpenAI server: a /health gate, an
-// OpenAI-compatible chat/completions endpoint, and a settable /metrics surface. It lets
-// the gateway + KEDA scale-to-zero loop run end-to-end on kind with no GPU.
+// Command vllm-stub is a CPU-only fake of the vLLM surfaces used in tests.
 package main
 
 import (
@@ -44,7 +42,7 @@ type Server struct {
 	metrics vllmMetrics
 }
 
-// vllmMetrics mirrors the LLM-aware gauges the Hearth scraper reads off vLLM's /metrics.
+// vllmMetrics mirrors gauges exposed by vLLM for optional observability tests.
 type vllmMetrics struct {
 	Waiting float64 `json:"waiting"`
 	Running float64 `json:"running"`
@@ -82,8 +80,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// handleControl lets a test set the LLM-aware gauges at runtime (e.g. raise queue depth
-// to exercise warm 1→N scaling) without restarting the stub.
+// handleControl lets a test change the exported gauges without restarting the stub.
 func (s *Server) handleControl(w http.ResponseWriter, r *http.Request) {
 	var in vllmMetrics
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {

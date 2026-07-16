@@ -6,6 +6,10 @@ on:
 
 permissions: {}
 
+env:
+  KEDA_VERSION: 2.20.1
+  KIND_VERSION: v0.32.0
+
 jobs:
   test-scale-e2e:
     permissions:
@@ -23,9 +27,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
       - name: Install kind
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
+          curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-$(go env GOARCH)"
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
@@ -36,9 +43,11 @@ jobs:
         run: |
           helm repo add kedacore https://kedacore.github.io/charts
           helm repo update kedacore
-          helm install keda kedacore/keda -n keda --create-namespace --wait --timeout 5m
+          helm install keda kedacore/keda --version "${KEDA_VERSION}" \
+            -n keda --create-namespace --wait --timeout 5m
 
       - name: Run the scale-to-zero e2e
         run: |
           go mod tidy
+          git diff --exit-code -- go.mod go.sum
           make test-scale-e2e

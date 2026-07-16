@@ -21,7 +21,6 @@ jobs:
           script: |
             const item = context.payload.pull_request || context.payload.issue;
             const title = item.title || "";
-            // Conventional Commit type (optional scope, optional "!") -> label
             const rules = [
               { re: /^fix(\(.+\))?!?:/i,  label: "bug" },
               { re: /^feat(\(.+\))?!?:/i, label: "enhancement" },

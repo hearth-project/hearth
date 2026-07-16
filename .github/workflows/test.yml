@@ -23,7 +23,21 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate Helm chart
+        run: |
+          helm lint charts/hearth
+          helm template hearth charts/hearth --namespace hearth-system >/dev/null
+          helm template hearth charts/hearth --namespace hearth-system \
+            --set serviceAccount.create=false \
+            --set operator.leaderElect=true >/dev/null
+
       - name: Running Tests
         run: |
           go mod tidy
+          git diff --exit-code -- go.mod go.sum
           make test
+          make helm-crds
+          git diff --exit-code

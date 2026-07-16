@@ -845,7 +845,6 @@ spec:
                 - ascend
                 - cambricon
                 - hygon
-                - moorethreads
                 type: string
             required:
             - accelerator

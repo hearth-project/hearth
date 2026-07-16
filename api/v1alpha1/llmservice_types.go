@@ -23,24 +23,28 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// LLMServiceSpec is the declarative, one-click description of a served model:
-// what to run, on which backend, how to scale (including to zero), and how to cache.
+// LLMServiceSpec describes a model, runtime, resources, scaling, caching, and endpoint.
 type LLMServiceSpec struct {
+	// model identifies the weights served by the backend.
 	Model ModelSpec `json:"model"`
 
 	// runtime selects the backend — pinned by name or auto-picked by vendor preference.
 	// +optional
 	Runtime RuntimeSelection `json:"runtime,omitempty"`
 
+	// resources requests accelerators and compute for each backend replica.
 	// +optional
 	Resources ResourceSpec `json:"resources,omitempty"`
 
+	// scaling configures KEDA and cold-start timing.
 	// +optional
 	Scaling ScalingSpec `json:"scaling,omitempty"`
 
+	// cache configures model-weight storage and prewarming.
 	// +optional
 	Cache CacheSpec `json:"cache,omitempty"`
 
+	// endpoint configures client-facing cold-start behavior.
 	// +optional
 	Endpoint EndpointSpec `json:"endpoint,omitempty"`
 
@@ -51,16 +55,19 @@ type LLMServiceSpec struct {
 	ImagePullSecrets []corev1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 }
 
+// ModelSpec identifies an inline model source or a future catalog entry.
 type ModelSpec struct {
-	// +optional
 	// catalogRef points to an external model catalog entry. Catalog resolution
 	// is currently not implemented in v0; use model.source.uri for now.
+	// +optional
 	CatalogRef string `json:"catalogRef,omitempty"`
 
+	// source is the inline model location used in v0.
 	// +optional
 	Source *ModelSource `json:"source,omitempty"`
 }
 
+// ModelSource describes an inline model location and optional credentials.
 type ModelSource struct {
 	// uri is the model location. Supported in v0: hf://, modelscope://, and
 	// pvc://<claim>[/<subpath>] (pre-staged weights on an existing PVC, mounted
@@ -73,7 +80,9 @@ type ModelSource struct {
 	SecretRef *corev1.LocalObjectReference `json:"secretRef,omitempty"`
 }
 
+// RuntimeSelection pins a runtime or selects one by vendor preference.
 type RuntimeSelection struct {
+	// name pins one cluster-scoped InferenceRuntime.
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -81,11 +90,13 @@ type RuntimeSelection struct {
 	// +optional
 	Selector *RuntimeSelector `json:"selector,omitempty"`
 
-	// argsOverride appends to / overrides the runtime's serving args.
+	// argsOverride is appended after the runtime's serving args. Duplicate flags may
+	// override earlier values when supported by the runtime CLI.
 	// +optional
 	ArgsOverride []string `json:"argsOverride,omitempty"`
 }
 
+// RuntimeSelector defines ordered runtime preferences.
 type RuntimeSelector struct {
 	// vendor lists acceptable vendors in preference order.
 	// +optional
@@ -95,6 +106,7 @@ type RuntimeSelector struct {
 // ResourceSpec is the abstract accelerator request; it maps onto the runtime's
 // accelerator definition at reconcile time.
 type ResourceSpec struct {
+	// accelerators is the number of whole devices requested per backend replica.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
@@ -105,18 +117,22 @@ type ResourceSpec struct {
 	// +optional
 	Fraction *AcceleratorFraction `json:"fraction,omitempty"`
 
+	// cpu is the CPU request for each backend replica.
 	// +optional
 	CPU *resource.Quantity `json:"cpu,omitempty"`
 
+	// memory is the memory request and limit for each backend replica.
 	// +optional
 	Memory *resource.Quantity `json:"memory,omitempty"`
 }
 
 // AcceleratorFraction requests a fraction of a device (e.g. NVIDIA via HAMi).
 type AcceleratorFraction struct {
+	// memory requests a device-memory slice.
 	// +optional
 	Memory *resource.Quantity `json:"memory,omitempty"`
 
+	// cores requests a device-compute share.
 	// +optional
 	Cores int32 `json:"cores,omitempty"`
 }
@@ -131,6 +147,7 @@ type ScalingSpec struct {
 	// +optional
 	Min int32 `json:"min,omitempty"`
 
+	// max is the maximum number of backend replicas.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	// +optional
@@ -154,11 +171,14 @@ type ScalingSpec struct {
 	// +optional
 	ActivationTimeout metav1.Duration `json:"activationTimeout,omitempty"`
 
+	// scaleDownStabilization delays HPA scale-down and the final transition to zero.
+	// Values must use whole seconds and cannot exceed the HPA limit of one hour.
 	// +kubebuilder:default="5m"
 	// +optional
 	ScaleDownStabilization metav1.Duration `json:"scaleDownStabilization,omitempty"`
 
-	// drainTimeout must be <= the runtime's terminationGracePeriodSeconds.
+	// drainTimeout is the pre-stop wait for in-flight requests. Hearth widens the
+	// pod termination grace period when this timeout needs more room.
 	// +kubebuilder:default="2m"
 	// +optional
 	DrainTimeout metav1.Duration `json:"drainTimeout,omitempty"`
@@ -167,11 +187,13 @@ type ScalingSpec struct {
 // CacheSpec selects how model weights are cached so cold pods load from local disk
 // instead of re-downloading on every scale-from-zero.
 type CacheSpec struct {
+	// strategy selects the model cache backend.
 	// +kubebuilder:validation:Enum=NodeLocalPVC;HostPath;SharedPVC;BakedImage;None
 	// +kubebuilder:default=NodeLocalPVC
 	// +optional
 	Strategy string `json:"strategy,omitempty"`
 
+	// size is the requested NodeLocalPVC capacity.
 	// +optional
 	Size *resource.Quantity `json:"size,omitempty"`
 
@@ -181,11 +203,12 @@ type CacheSpec struct {
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	// prewarm hydrates weights into the cache before first traffic.
+	// prewarm requests a one-time Job that hydrates weights into the cache.
 	// +optional
 	Prewarm bool `json:"prewarm,omitempty"`
 }
 
+// EndpointSpec configures client-facing protocol and cold-start behavior.
 type EndpointSpec struct {
 	// openAICompatible is informational in v0: the gateway always serves the
 	// OpenAI-compatible API. Reserved for future protocol selection.
@@ -193,10 +216,12 @@ type EndpointSpec struct {
 	// +optional
 	OpenAICompatible bool `json:"openAICompatible,omitempty"`
 
+	// coldStart configures requests received while the backend is unavailable.
 	// +optional
 	ColdStart ColdStartSpec `json:"coldStart,omitempty"`
 }
 
+// ColdStartSpec configures how the gateway handles a cold backend.
 type ColdStartSpec struct {
 	// mode is how cold requests are handled: keepalive (SSE heartbeats hold the
 	// connection) or reject (fast 503 + Retry-After for the client to retry).
@@ -205,11 +230,13 @@ type ColdStartSpec struct {
 	// +optional
 	Mode string `json:"mode,omitempty"`
 
+	// heartbeatInterval controls SSE keepalive comments while activation waits.
 	// +kubebuilder:default="10s"
 	// +optional
 	HeartbeatInterval metav1.Duration `json:"heartbeatInterval,omitempty"`
 }
 
+// LLMServicePhase summarizes backend availability.
 // +kubebuilder:validation:Enum=Pending;Loading;Ready;ScaledToZero;Degraded
 type LLMServicePhase string
 
@@ -223,6 +250,7 @@ const (
 
 // LLMServiceStatus defines the observed state of LLMService.
 type LLMServiceStatus struct {
+	// phase summarizes backend availability.
 	// +optional
 	Phase LLMServicePhase `json:"phase,omitempty"`
 
@@ -230,6 +258,7 @@ type LLMServiceStatus struct {
 	// +optional
 	ResolvedRuntime string `json:"resolvedRuntime,omitempty"`
 
+	// replicas is the number of ready backend replicas.
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
@@ -237,6 +266,7 @@ type LLMServiceStatus struct {
 	// +optional
 	EndpointURL string `json:"endpointURL,omitempty"`
 
+	// conditions describe the service's observed state.
 	// +listType=map
 	// +listMapKey=type
 	// +optional
@@ -250,7 +280,7 @@ type LLMServiceStatus struct {
 // +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=".status.replicas"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
-// LLMService is the Schema for the llmservices API
+// LLMService declaratively serves one model behind a scale-to-zero gateway.
 type LLMService struct {
 	metav1.TypeMeta `json:",inline"`
 

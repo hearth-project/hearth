@@ -30,7 +30,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: LLMService is the Schema for the llmservices API
+        description: LLMService declaratively serves one model behind a scale-to-zero
+          gateway.
         properties:
           apiVersion:
             description: |-
@@ -50,23 +51,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              LLMServiceSpec is the declarative, one-click description of a served model:
-              what to run, on which backend, how to scale (including to zero), and how to cache.
+            description: LLMServiceSpec describes a model, runtime, resources, scaling,
+              caching, and endpoint.
             properties:
               cache:
-                description: |-
-                  CacheSpec selects how model weights are cached so cold pods load from local disk
-                  instead of re-downloading on every scale-from-zero.
+                description: cache configures model-weight storage and prewarming.
                 properties:
                   prewarm:
-                    description: prewarm hydrates weights into the cache before first
-                      traffic.
+                    description: prewarm requests a one-time Job that hydrates weights
+                      into the cache.
                     type: boolean
                   size:
                     anyOf:
                     - type: integer
                     - type: string
+                    description: size is the requested NodeLocalPVC capacity.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   storageClassName:
@@ -77,6 +76,7 @@ spec:
                     type: string
                   strategy:
                     default: NodeLocalPVC
+                    description: strategy selects the model cache backend.
                     enum:
                     - NodeLocalPVC
                     - HostPath
@@ -86,11 +86,16 @@ spec:
                     type: string
                 type: object
               endpoint:
+                description: endpoint configures client-facing cold-start behavior.
                 properties:
                   coldStart:
+                    description: coldStart configures requests received while the
+                      backend is unavailable.
                     properties:
                       heartbeatInterval:
                         default: 10s
+                        description: heartbeatInterval controls SSE keepalive comments
+                          while activation waits.
                         type: string
                       mode:
                         default: keepalive
@@ -132,6 +137,7 @@ spec:
                   x-kubernetes-map-type: atomic
                 type: array
               model:
+                description: model identifies the weights served by the backend.
                 properties:
                   catalogRef:
                     description: |-
@@ -139,6 +145,7 @@ spec:
                       is currently not implemented in v0; use model.source.uri for now.
                     type: string
                   source:
+                    description: source is the inline model location used in v0.
                     properties:
                       secretRef:
                         description: |-
@@ -167,12 +174,13 @@ spec:
                     type: object
                 type: object
               resources:
-                description: |-
-                  ResourceSpec is the abstract accelerator request; it maps onto the runtime's
-                  accelerator definition at reconcile time.
+                description: resources requests accelerators and compute for each
+                  backend replica.
                 properties:
                   accelerators:
                     default: 1
+                    description: accelerators is the number of whole devices requested
+                      per backend replica.
                     format: int32
                     minimum: 1
                     type: integer
@@ -180,6 +188,7 @@ spec:
                     anyOf:
                     - type: integer
                     - type: string
+                    description: cpu is the CPU request for each backend replica.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   fraction:
@@ -188,12 +197,14 @@ spec:
                       Not supported in v0 (no runtime supports sharing yet): setting it fails reconcile.
                     properties:
                       cores:
+                        description: cores requests a device-compute share.
                         format: int32
                         type: integer
                       memory:
                         anyOf:
                         - type: integer
                         - type: string
+                        description: memory requests a device-memory slice.
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                     type: object
@@ -201,6 +212,8 @@ spec:
                     anyOf:
                     - type: integer
                     - type: string
+                    description: memory is the memory request and limit for each backend
+                      replica.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                 type: object
@@ -209,12 +222,14 @@ spec:
                   by vendor preference.
                 properties:
                   argsOverride:
-                    description: argsOverride appends to / overrides the runtime's
-                      serving args.
+                    description: |-
+                      argsOverride is appended after the runtime's serving args. Duplicate flags may
+                      override earlier values when supported by the runtime CLI.
                     items:
                       type: string
                     type: array
                   name:
+                    description: name pins one cluster-scoped InferenceRuntime.
                     type: string
                   selector:
                     description: selector auto-picks among runtimes by vendor preference
@@ -229,9 +244,7 @@ spec:
                     type: object
                 type: object
               scaling:
-                description: |-
-                  ScalingSpec configures KEDA-driven autoscaling. Scaling is intentionally limited
-                  to LLM-aware signals: CPU and raw RPS are not supported.
+                description: scaling configures KEDA and cold-start timing.
                 properties:
                   activationTimeout:
                     default: 5m
@@ -240,10 +253,13 @@ spec:
                     type: string
                   drainTimeout:
                     default: 2m
-                    description: drainTimeout must be <= the runtime's terminationGracePeriodSeconds.
+                    description: |-
+                      drainTimeout is the pre-stop wait for in-flight requests. Hearth widens the
+                      pod termination grace period when this timeout needs more room.
                     type: string
                   max:
                     default: 1
+                    description: max is the maximum number of backend replicas.
                     format: int32
                     minimum: 1
                     type: integer
@@ -264,6 +280,9 @@ spec:
                     type: integer
                   scaleDownStabilization:
                     default: 5m
+                    description: |-
+                      scaleDownStabilization delays HPA scale-down and the final transition to zero.
+                      Values must use whole seconds and cannot exceed the HPA limit of one hour.
                     type: string
                   target:
                     default: 10
@@ -282,6 +301,7 @@ spec:
             description: LLMServiceStatus defines the observed state of LLMService.
             properties:
               conditions:
+                description: conditions describe the service's observed state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -345,6 +365,7 @@ spec:
                   should call.
                 type: string
               phase:
+                description: phase summarizes backend availability.
                 enum:
                 - Pending
                 - Loading
@@ -353,6 +374,7 @@ spec:
                 - Degraded
                 type: string
               replicas:
+                description: replicas is the number of ready backend replicas.
                 format: int32
                 type: integer
               resolvedRuntime:

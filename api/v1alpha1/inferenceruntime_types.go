@@ -22,14 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// InferenceRuntimeSpec defines a pluggable inference backend (e.g. NVIDIA-vLLM,
-// vLLM-Ascend, vLLM-MLU). It adapts a vendor runtime to Kubernetes — scheduling,
-// health, model loading and metrics — without ever touching chip kernels.
+// InferenceRuntimeSpec defines a reusable inference backend and its Kubernetes integration.
 type InferenceRuntimeSpec struct {
+	// family identifies the serving engine; v0 supports vLLM.
 	// +kubebuilder:default=vllm
+	// +kubebuilder:validation:Enum=vllm
 	Family string `json:"family"`
 
-	// +kubebuilder:validation:Enum=nvidia;ascend;cambricon;hygon
+	// vendor selects a registered Kubernetes backend adapter.
+	// +kubebuilder:validation:Enum=nvidia;ascend
 	Vendor string `json:"vendor"`
 
 	// priority breaks ties when several runtimes match an LLMService selector (higher wins).
@@ -37,47 +38,57 @@ type InferenceRuntimeSpec struct {
 	// +optional
 	Priority int32 `json:"priority,omitempty"`
 
-	// container is the serving container; it must expose the OpenAI API and /metrics.
+	// container must expose the OpenAI-compatible API on its configured port.
 	Container RuntimeContainer `json:"container"`
 
+	// accelerator describes the device-plugin resource and pod scheduling constraints.
 	Accelerator AcceleratorSpec `json:"accelerator"`
 
+	// health configures probes for model loading and serving.
 	// +optional
 	Health RuntimeHealth `json:"health,omitempty"`
 
+	// lifecycle configures graceful serving-pod termination.
 	// +optional
 	Lifecycle RuntimeLifecycle `json:"lifecycle,omitempty"`
 
-	Metrics RuntimeMetrics `json:"metrics"`
+	// metrics describes optional runtime telemetry for external integrations.
+	// Hearth autoscaling uses the gateway queue and does not consume these fields.
+	// +optional
+	Metrics RuntimeMetrics `json:"metrics,omitempty"`
 }
 
+// RuntimeContainer describes the serving container rendered into backend pods.
 type RuntimeContainer struct {
+	// image is the serving runtime image.
 	Image string `json:"image"`
 
-	// args are Go-templated and rendered by the operator with model, service and
-	// accelerator context before being applied to the pod.
+	// args are Go-templated and rendered with model and service context.
 	// +optional
 	Args []string `json:"args,omitempty"`
 
+	// env is copied to the serving container; literal values may use arg templates.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// port is the single port serving both the OpenAI API and /metrics.
+	// port serves the OpenAI-compatible API and, when enabled by the runtime, metrics.
 	Port RuntimePort `json:"port"`
 }
 
+// RuntimePort identifies the serving container's named TCP port.
 type RuntimePort struct {
+	// name is referenced by Services and probes.
 	// +kubebuilder:default=http
 	Name string `json:"name"`
 
+	// containerPort is the serving API port.
 	// +kubebuilder:default=8000
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
 	ContainerPort int32 `json:"containerPort"`
 }
 
-// AcceleratorSpec adapts the abstract accelerator request to a concrete vendor
-// device-plugin resource and scheduling, reusing (never replacing) HAMi/Volcano.
+// AcceleratorSpec maps an abstract request to a device-plugin resource and scheduler.
 type AcceleratorSpec struct {
 	// resourceName is the device-plugin resource key (e.g. nvidia.com/gpu,
 	// huawei.com/Ascend910). Configurable because it varies by vendor and version.
@@ -87,9 +98,11 @@ type AcceleratorSpec struct {
 	// +optional
 	Sharing AcceleratorSharing `json:"sharing,omitempty"`
 
+	// nodeSelector constrains backend and prewarm pods to compatible nodes.
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// tolerations let backend and prewarm pods use tainted accelerator nodes.
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
@@ -98,11 +111,14 @@ type AcceleratorSpec struct {
 	Scheduler RuntimeScheduler `json:"scheduler,omitempty"`
 }
 
+// AcceleratorSharing declares adapter support for fractional devices.
 type AcceleratorSharing struct {
+	// supported declares that the adapter can honor fractional device requests.
 	// +optional
 	Supported bool `json:"supported,omitempty"`
 }
 
+// RuntimeScheduler routes backend and prewarm pods to an installed scheduler.
 type RuntimeScheduler struct {
 	// name is the scheduler name; empty uses the default scheduler.
 	// +optional
@@ -117,18 +133,23 @@ type RuntimeScheduler struct {
 // RuntimeHealth holds model-load-aware probes. startup gives slow weight loads
 // minutes of headroom before liveness can kill the pod.
 type RuntimeHealth struct {
+	// readiness controls when the backend receives traffic.
 	// +optional
 	Readiness *corev1.Probe `json:"readiness,omitempty"`
 
+	// liveness detects a failed serving process after startup.
 	// +optional
 	Liveness *corev1.Probe `json:"liveness,omitempty"`
 
+	// startup protects slow model loading from liveness restarts.
 	// +optional
 	Startup *corev1.Probe `json:"startup,omitempty"`
 }
 
+// RuntimeLifecycle configures graceful termination of serving pods.
 type RuntimeLifecycle struct {
-	// terminationGracePeriodSeconds must cover the longest in-flight stream.
+	// terminationGracePeriodSeconds is the base pod shutdown budget; Hearth widens
+	// it when the configured drain timeout requires more time.
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
@@ -139,30 +160,35 @@ type RuntimeLifecycle struct {
 	PreStopDrain bool `json:"preStopDrain,omitempty"`
 }
 
-// RuntimeMetrics maps logical scaling signals to the runtime's Prometheus metric
-// names. vLLM serves /metrics on the same port as the API.
+// RuntimeMetrics describes runtime metrics for external observability integrations.
 type RuntimeMetrics struct {
+	// path is the runtime's Prometheus scrape path.
 	// +kubebuilder:default=/metrics
 	Path string `json:"path"`
 
+	// port names the Service port that exposes runtime metrics.
 	// +kubebuilder:default=http
 	Port string `json:"port"`
 
-	// queueDepth is the pending-requests metric used for scale-to-zero and scaling.
+	// queueDepth is the runtime's pending-request metric.
 	QueueDepth string `json:"queueDepth"`
 
+	// kvCacheUtil is the runtime's KV-cache utilization metric.
 	// +optional
 	KVCacheUtil string `json:"kvCacheUtil,omitempty"`
 
+	// running is the runtime's in-flight request metric.
 	// +optional
 	Running string `json:"running,omitempty"`
 
+	// ttft is the runtime's time-to-first-token metric.
 	// +optional
 	TTFT string `json:"ttft,omitempty"`
 }
 
 // InferenceRuntimeStatus defines the observed state of InferenceRuntime.
 type InferenceRuntimeStatus struct {
+	// conditions describe the runtime's observed state.
 	// +listType=map
 	// +listMapKey=type
 	// +optional

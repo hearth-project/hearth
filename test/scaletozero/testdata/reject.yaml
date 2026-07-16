@@ -21,11 +21,6 @@ spec:
   health:
     readiness:
       httpGet: { path: /health, port: http }
-  metrics:
-    path: /metrics
-    port: http
-    queueDepth: vllm:num_requests_waiting
-    kvCacheUtil: vllm:gpu_cache_usage_perc
 ---
 apiVersion: serving.hearth.dev/v1alpha1
 kind: LLMService

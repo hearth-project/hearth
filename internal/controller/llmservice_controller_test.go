@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,7 +67,6 @@ var _ = Describe("LLMService Controller", func() {
 						Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
 					},
 					Accelerator: servingv1alpha1.AcceleratorSpec{ResourceName: "nvidia.com/gpu"},
-					Metrics:     servingv1alpha1.RuntimeMetrics{Path: "/metrics", Port: "http", QueueDepth: "vllm:num_requests_waiting"},
 				},
 			}
 			Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, rt))).To(Succeed())
@@ -107,12 +107,10 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(c.Env).To(ContainElement(corev1.EnvVar{Name: "VLLM_USE_MODELSCOPE", Value: "true"}))
 			Expect(dep.OwnerReferences).NotTo(BeEmpty())
 
-			// the internal backend Service selects the vLLM pods
 			backendSvc := &corev1.Service{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-backend", Namespace: namespace}, backendSvc)).To(Succeed())
 			Expect(backendSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/llmservice", svcName))
 
-			// the user-facing Service and HA gateway sit in front
 			gwDep := &appsv1.Deployment{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-gateway", Namespace: namespace}, gwDep)).To(Succeed())
 			Expect(gwDep.Spec.Replicas).NotTo(BeNil())
@@ -121,7 +119,6 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(k8sClient.Get(ctx, key, gwSvc)).To(Succeed())
 			Expect(gwSvc.Spec.Selector).To(HaveKeyWithValue("serving.hearth.dev/gateway", svcName))
 
-			// cache defaults to NodeLocalPVC, so a cache PVC is provisioned
 			pvc := &corev1.PersistentVolumeClaim{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-cache", Namespace: namespace}, pvc)).To(Succeed())
 
@@ -129,10 +126,10 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(k8sClient.Get(ctx, key, updated)).To(Succeed())
 			Expect(updated.Status.ResolvedRuntime).To(Equal(runtimeName))
 			Expect(updated.Status.EndpointURL).To(ContainSubstring(svcName))
+			Expect(meta.FindStatusCondition(updated.Status.Conditions, "Ready").Reason).To(Equal("ScaledToZero"))
 		})
 
 		It("resolves the runtime via vendor selector", func() {
-			// decoy: a higher-priority runtime of another vendor must not match [nvidia]
 			decoy := &servingv1alpha1.InferenceRuntime{
 				ObjectMeta: metav1.ObjectMeta{Name: "vllm-ascend-decoy"},
 				Spec: servingv1alpha1.InferenceRuntimeSpec{
@@ -144,7 +141,6 @@ var _ = Describe("LLMService Controller", func() {
 						Port:  servingv1alpha1.RuntimePort{Name: "http", ContainerPort: 8000},
 					},
 					Accelerator: servingv1alpha1.AcceleratorSpec{ResourceName: "huawei.com/Ascend910"},
-					Metrics:     servingv1alpha1.RuntimeMetrics{Path: "/metrics", Port: "http", QueueDepth: "vllm:num_requests_waiting"},
 				},
 			}
 			Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, decoy))).To(Succeed())
@@ -187,6 +183,8 @@ var _ = Describe("LLMService Controller", func() {
 
 			_, err := reconciler().Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).To(HaveOccurred())
+			_, err = reconciler().Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).To(HaveOccurred(), "an unchanged failure status must not stop retries")
 
 			updated := &servingv1alpha1.LLMService{}
 			Expect(k8sClient.Get(ctx, key, updated)).To(Succeed())

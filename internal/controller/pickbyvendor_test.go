@@ -59,12 +59,26 @@ func TestPickByVendorPriorityTieBreak(t *testing.T) {
 	g.Expect(got.Name).To(Equal("vllm-ascend"))
 }
 
+func TestPickByVendorRejectsAmbiguousPriority(t *testing.T) {
+	g := NewWithT(t)
+	items := []servingv1alpha1.InferenceRuntime{
+		rt("vllm-ascend-310p-pro", "ascend", 90),
+		rt("vllm-ascend-310p-duo", "ascend", 90),
+	}
+
+	_, err := pickByVendor(items, []string{"ascend"})
+	g.Expect(err).To(MatchError(And(
+		ContainSubstring("multiple InferenceRuntimes"),
+		ContainSubstring("set spec.runtime.name"),
+	)))
+}
+
 func TestPickByVendorFallsThroughToNextVendor(t *testing.T) {
 	g := NewWithT(t)
 	items := []servingv1alpha1.InferenceRuntime{
 		rt("vllm-nvidia", "nvidia", 0),
 	}
-	got, err := pickByVendor(items, []string{"cambricon", "nvidia"})
+	got, err := pickByVendor(items, []string{"unsupported", "nvidia"})
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(got.Name).To(Equal("vllm-nvidia"))
 }

@@ -52,19 +52,18 @@ spec:
           metadata:
             type: object
           spec:
-            description: |-
-              InferenceRuntimeSpec defines a pluggable inference backend (e.g. NVIDIA-vLLM,
-              vLLM-Ascend, vLLM-MLU). It adapts a vendor runtime to Kubernetes — scheduling,
-              health, model loading and metrics — without ever touching chip kernels.
+            description: InferenceRuntimeSpec defines a reusable inference backend
+              and its Kubernetes integration.
             properties:
               accelerator:
-                description: |-
-                  AcceleratorSpec adapts the abstract accelerator request to a concrete vendor
-                  device-plugin resource and scheduling, reusing (never replacing) HAMi/Volcano.
+                description: accelerator describes the device-plugin resource and
+                  pod scheduling constraints.
                 properties:
                   nodeSelector:
                     additionalProperties:
                       type: string
+                    description: nodeSelector constrains backend and prewarm pods
+                      to compatible nodes.
                     type: object
                   resourceName:
                     description: |-
@@ -90,9 +89,13 @@ spec:
                       devices (e.g. NVIDIA via HAMi).
                     properties:
                       supported:
+                        description: supported declares that the adapter can honor
+                          fractional device requests.
                         type: boolean
                     type: object
                   tolerations:
+                    description: tolerations let backend and prewarm pods use tainted
+                      accelerator nodes.
                     items:
                       description: |-
                         The pod this Toleration is attached to tolerates any taint that matches
@@ -135,17 +138,18 @@ spec:
                 - resourceName
                 type: object
               container:
-                description: container is the serving container; it must expose the
-                  OpenAI API and /metrics.
+                description: container must expose the OpenAI-compatible API on its
+                  configured port.
                 properties:
                   args:
-                    description: |-
-                      args are Go-templated and rendered by the operator with model, service and
-                      accelerator context before being applied to the pod.
+                    description: args are Go-templated and rendered with model and
+                      service context.
                     items:
                       type: string
                     type: array
                   env:
+                    description: env is copied to the serving container; literal values
+                      may use arg templates.
                     items:
                       description: EnvVar represents an environment variable present
                         in a Container.
@@ -303,19 +307,22 @@ spec:
                       type: object
                     type: array
                   image:
+                    description: image is the serving runtime image.
                     type: string
                   port:
-                    description: port is the single port serving both the OpenAI API
-                      and /metrics.
+                    description: port serves the OpenAI-compatible API and, when enabled
+                      by the runtime, metrics.
                     properties:
                       containerPort:
                         default: 8000
+                        description: containerPort is the serving API port.
                         format: int32
                         maximum: 65535
                         minimum: 1
                         type: integer
                       name:
                         default: http
+                        description: name is referenced by Services and probes.
                         type: string
                     required:
                     - containerPort
@@ -327,16 +334,15 @@ spec:
                 type: object
               family:
                 default: vllm
+                description: family identifies the serving engine; v0 supports vLLM.
+                enum:
+                - vllm
                 type: string
               health:
-                description: |-
-                  RuntimeHealth holds model-load-aware probes. startup gives slow weight loads
-                  minutes of headroom before liveness can kill the pod.
+                description: health configures probes for model loading and serving.
                 properties:
                   liveness:
-                    description: |-
-                      Probe describes a health check to be performed against a container to determine whether it is
-                      alive or ready to receive traffic.
+                    description: liveness detects a failed serving process after startup.
                     properties:
                       exec:
                         description: Exec specifies a command to execute in the container.
@@ -487,9 +493,7 @@ spec:
                         type: integer
                     type: object
                   readiness:
-                    description: |-
-                      Probe describes a health check to be performed against a container to determine whether it is
-                      alive or ready to receive traffic.
+                    description: readiness controls when the backend receives traffic.
                     properties:
                       exec:
                         description: Exec specifies a command to execute in the container.
@@ -640,9 +644,8 @@ spec:
                         type: integer
                     type: object
                   startup:
-                    description: |-
-                      Probe describes a health check to be performed against a container to determine whether it is
-                      alive or ready to receive traffic.
+                    description: startup protects slow model loading from liveness
+                      restarts.
                     properties:
                       exec:
                         description: Exec specifies a command to execute in the container.
@@ -794,6 +797,7 @@ spec:
                     type: object
                 type: object
               lifecycle:
+                description: lifecycle configures graceful serving-pod termination.
                 properties:
                   preStopDrain:
                     description: |-
@@ -801,32 +805,39 @@ spec:
                       to finish before the pod is torn down.
                     type: boolean
                   terminationGracePeriodSeconds:
-                    description: terminationGracePeriodSeconds must cover the longest
-                      in-flight stream.
+                    description: |-
+                      terminationGracePeriodSeconds is the base pod shutdown budget; Hearth widens
+                      it when the configured drain timeout requires more time.
                     format: int64
                     minimum: 1
                     type: integer
                 type: object
               metrics:
                 description: |-
-                  RuntimeMetrics maps logical scaling signals to the runtime's Prometheus metric
-                  names. vLLM serves /metrics on the same port as the API.
+                  metrics describes optional runtime telemetry for external integrations.
+                  Hearth autoscaling uses the gateway queue and does not consume these fields.
                 properties:
                   kvCacheUtil:
+                    description: kvCacheUtil is the runtime's KV-cache utilization
+                      metric.
                     type: string
                   path:
                     default: /metrics
+                    description: path is the runtime's Prometheus scrape path.
                     type: string
                   port:
                     default: http
+                    description: port names the Service port that exposes runtime
+                      metrics.
                     type: string
                   queueDepth:
-                    description: queueDepth is the pending-requests metric used for
-                      scale-to-zero and scaling.
+                    description: queueDepth is the runtime's pending-request metric.
                     type: string
                   running:
+                    description: running is the runtime's in-flight request metric.
                     type: string
                   ttft:
+                    description: ttft is the runtime's time-to-first-token metric.
                     type: string
                 required:
                 - path
@@ -840,23 +851,22 @@ spec:
                 format: int32
                 type: integer
               vendor:
+                description: vendor selects a registered Kubernetes backend adapter.
                 enum:
                 - nvidia
                 - ascend
-                - cambricon
-                - hygon
                 type: string
             required:
             - accelerator
             - container
             - family
-            - metrics
             - vendor
             type: object
           status:
             description: InferenceRuntimeStatus defines the observed state of InferenceRuntime.
             properties:
               conditions:
+                description: conditions describe the runtime's observed state.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.

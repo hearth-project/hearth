@@ -28,12 +28,9 @@ rules:
   verbs: [create, delete, get, list, patch, update, watch]
 - apiGroups: [serving.hearth.dev]
   resources: [inferenceruntimes, llmservices]
-  verbs: [create, delete, get, list, patch, update, watch]
+  verbs: [get, list, watch]
 - apiGroups: [serving.hearth.dev]
-  resources: [inferenceruntimes/finalizers, llmservices/finalizers]
-  verbs: [update]
-- apiGroups: [serving.hearth.dev]
-  resources: [inferenceruntimes/status, llmservices/status]
+  resources: [llmservices/status]
   verbs: [get, patch, update]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

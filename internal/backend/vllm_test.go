@@ -88,10 +88,8 @@ func TestRenderVLLMPodSpecMountsModelPVC(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	c := pod.Containers[0]
-	// --model points at the path inside the mounted PVC
 	g.Expect(c.Args).To(ContainElement("--model=/models/Qwen3-8B"))
 
-	// the serving container mounts the model store read-only
 	var mounted bool
 	for _, vm := range c.VolumeMounts {
 		if vm.MountPath == "/models" {
@@ -101,7 +99,6 @@ func TestRenderVLLMPodSpecMountsModelPVC(t *testing.T) {
 	}
 	g.Expect(mounted).To(BeTrue())
 
-	// the volume references the user's existing PVC
 	var claim string
 	for _, v := range pod.Volumes {
 		if v.PersistentVolumeClaim != nil {

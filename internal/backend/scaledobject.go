@@ -19,6 +19,7 @@ package backend
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -31,6 +32,7 @@ const (
 	defaultPollingInterval = 5 // seconds; the gateway hold masks this poll latency
 	defaultMaxReplicas     = 1
 	defaultTarget          = 10
+	maxHPAStabilization    = time.Hour
 )
 
 func ScaledObjectName(svc *servingv1alpha1.LLMService) string { return svc.Name }
@@ -38,10 +40,6 @@ func ScaledObjectName(svc *servingv1alpha1.LLMService) string { return svc.Name 
 // BuildScaledObject renders a KEDA ScaledObject that scales the backend Deployment
 // (0..N, including scale-to-zero) on the gateway's pending-request count via the
 // built-in metrics-api scaler. The always-on gateway is what KEDA polls.
-//
-// NOTE: this uses metrics-api (poll-based). A future optimization is a custom gRPC
-// external scaler with StreamIsActive (push) to shave the polling interval off the
-// first cold start; the gateway's request hold makes that latency invisible for now.
 func BuildScaledObject(svc *servingv1alpha1.LLMService) (*unstructured.Unstructured, error) {
 	if m := svc.Spec.Scaling.Metric; m != "" && m != "queueDepth" {
 		return nil, fmt.Errorf("scaling.metric %q is not supported in v0; only queueDepth is wired to the autoscaler", m)
@@ -73,8 +71,20 @@ func BuildScaledObject(svc *servingv1alpha1.LLMService) (*unstructured.Unstructu
 			},
 		},
 	}
-	if cooldown := int64(svc.Spec.Scaling.ScaleDownStabilization.Seconds()); cooldown > 0 {
-		spec["cooldownPeriod"] = cooldown
+	window := svc.Spec.Scaling.ScaleDownStabilization.Duration
+	if window < 0 || window%time.Second != 0 || window > maxHPAStabilization {
+		return nil, fmt.Errorf("scaling.scaleDownStabilization must be a whole number of seconds from 0s to 1h")
+	}
+	cooldown := int64(window / time.Second)
+	spec["cooldownPeriod"] = cooldown
+	spec["advanced"] = map[string]any{
+		"horizontalPodAutoscalerConfig": map[string]any{
+			"behavior": map[string]any{
+				"scaleDown": map[string]any{
+					"stabilizationWindowSeconds": cooldown,
+				},
+			},
+		},
 	}
 
 	obj := &unstructured.Unstructured{}

@@ -159,6 +159,10 @@ func WholeDeviceAccelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1
 	if name == "" {
 		return AcceleratorRequest{}, fmt.Errorf("runtime %q has no accelerator.resourceName", rt.Name)
 	}
+	scheduler := rt.Spec.Accelerator.Scheduler
+	if scheduler.Queue != "" && scheduler.Name != "volcano" {
+		return AcceleratorRequest{}, fmt.Errorf("runtime %q sets accelerator.scheduler.queue without scheduler.name=volcano", rt.Name)
+	}
 	if svc.Spec.Resources.Fraction != nil {
 		return AcceleratorRequest{}, fmt.Errorf("resources.fraction is not supported in v0; runtime %q serves whole devices, set resources.accelerators instead", rt.Name)
 	}
@@ -170,18 +174,9 @@ func WholeDeviceAccelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1
 		Resources:     corev1.ResourceList{corev1.ResourceName(name): *resource.NewQuantity(int64(count), resource.DecimalSI)},
 		NodeSelector:  rt.Spec.Accelerator.NodeSelector,
 		Tolerations:   rt.Spec.Accelerator.Tolerations,
-		SchedulerName: rt.Spec.Accelerator.Scheduler.Name,
-		Queue:         rt.Spec.Accelerator.Scheduler.Queue,
+		SchedulerName: scheduler.Name,
+		Queue:         scheduler.Queue,
 	}, nil
-}
-
-func MetricsFromRuntime(rt *servingv1alpha1.InferenceRuntime) MetricsSource {
-	return MetricsSource{
-		Path:        rt.Spec.Metrics.Path,
-		PortName:    rt.Spec.Metrics.Port,
-		QueueDepth:  rt.Spec.Metrics.QueueDepth,
-		KVCacheUtil: rt.Spec.Metrics.KVCacheUtil,
-	}
 }
 
 type HostMount struct {

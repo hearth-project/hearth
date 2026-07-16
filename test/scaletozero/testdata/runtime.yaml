@@ -42,8 +42,3 @@ spec:
   lifecycle:
     terminationGracePeriodSeconds: 30
     preStopDrain: true
-  metrics:
-    path: /metrics
-    port: http
-    queueDepth: vllm:num_requests_waiting
-    kvCacheUtil: vllm:gpu_cache_usage_perc

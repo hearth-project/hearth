@@ -37,9 +37,6 @@ func (stubAdapter) PodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.
 func (stubAdapter) Accelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) (backend.AcceleratorRequest, error) {
 	return backend.WholeDeviceAccelerator(svc, rt)
 }
-func (stubAdapter) MetricsSource(rt *servingv1alpha1.InferenceRuntime) backend.MetricsSource {
-	return backend.MetricsFromRuntime(rt)
-}
 
 func runtimeFixture() *servingv1alpha1.InferenceRuntime {
 	return &servingv1alpha1.InferenceRuntime{
@@ -160,7 +157,6 @@ func TestBakedImageNotSupportedYet(t *testing.T) {
 func TestPrewarmJob(t *testing.T) {
 	g := NewWithT(t)
 
-	// prewarm on + persistent cache => a download Job
 	job, err := backend.BuildPrewarmJob(serviceWithCache("NodeLocalPVC", true), runtimeFixture(), model())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(job).NotTo(BeNil())
@@ -170,12 +166,10 @@ func TestPrewarmJob(t *testing.T) {
 	g.Expect(jc.Env).To(ContainElement(corev1.EnvVar{Name: "TORCH_DEVICE_BACKEND_AUTOLOAD", Value: "0"}))
 	g.Expect(jc.VolumeMounts).To(ContainElement(corev1.VolumeMount{Name: "model-cache", MountPath: "/cache"}))
 
-	// prewarm off => no Job
 	job, err = backend.BuildPrewarmJob(serviceWithCache("NodeLocalPVC", false), runtimeFixture(), model())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(job).To(BeNil())
 
-	// prewarm on but no persistent cache => no Job
 	job, err = backend.BuildPrewarmJob(serviceWithCache("None", true), runtimeFixture(), model())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(job).To(BeNil())

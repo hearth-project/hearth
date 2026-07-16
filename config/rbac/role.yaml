@@ -59,24 +59,12 @@ rules:
   - inferenceruntimes
   - llmservices
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - serving.hearth.dev
   resources:
-  - inferenceruntimes/finalizers
-  - llmservices/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - serving.hearth.dev
-  resources:
-  - inferenceruntimes/status
   - llmservices/status
   verbs:
   - get

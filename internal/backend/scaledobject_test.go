@@ -18,6 +18,7 @@ package backend_test
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,9 @@ func scalingService() *servingv1alpha1.LLMService {
 
 func TestScaledObjectMetricsAPITrigger(t *testing.T) {
 	g := NewWithT(t)
-	so, err := backend.BuildScaledObject(scalingService())
+	svc := scalingService()
+	svc.Spec.Scaling.ScaleDownStabilization = metav1.Duration{Duration: 5 * time.Minute}
+	so, err := backend.BuildScaledObject(svc)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(so.GetAPIVersion()).To(Equal("keda.sh/v1alpha1"))
@@ -47,6 +50,12 @@ func TestScaledObjectMetricsAPITrigger(t *testing.T) {
 	g.Expect(spec["minReplicaCount"]).To(Equal(int64(0)))
 	g.Expect(spec["maxReplicaCount"]).To(Equal(int64(3)))
 	g.Expect(spec["scaleTargetRef"]).To(HaveKeyWithValue("name", "qwen3-8b"))
+	g.Expect(spec["cooldownPeriod"]).To(Equal(int64(300)))
+	advanced := spec["advanced"].(map[string]any)
+	hpa := advanced["horizontalPodAutoscalerConfig"].(map[string]any)
+	behavior := hpa["behavior"].(map[string]any)
+	scaleDown := behavior["scaleDown"].(map[string]any)
+	g.Expect(scaleDown["stabilizationWindowSeconds"]).To(Equal(int64(300)))
 
 	triggers := spec["triggers"].([]any)
 	g.Expect(triggers).To(HaveLen(1))
@@ -70,4 +79,29 @@ func TestScaledObjectRejectsUnimplementedMetric(t *testing.T) {
 	svc.Spec.Scaling.Metric = "queueDepth"
 	_, err = backend.BuildScaledObject(svc)
 	g.Expect(err).NotTo(HaveOccurred())
+}
+
+func TestScaledObjectRejectsInvalidScaleDownStabilization(t *testing.T) {
+	for _, window := range []time.Duration{-time.Second, 1500 * time.Millisecond, 61 * time.Minute} {
+		t.Run(window.String(), func(t *testing.T) {
+			g := NewWithT(t)
+			svc := scalingService()
+			svc.Spec.Scaling.ScaleDownStabilization = metav1.Duration{Duration: window}
+			_, err := backend.BuildScaledObject(svc)
+			g.Expect(err).To(MatchError(ContainSubstring("from 0s to 1h")))
+		})
+	}
+}
+
+func TestScaledObjectPreservesZeroScaleDownStabilization(t *testing.T) {
+	g := NewWithT(t)
+	so, err := backend.BuildScaledObject(scalingService())
+	g.Expect(err).NotTo(HaveOccurred())
+	spec := so.Object["spec"].(map[string]any)
+	g.Expect(spec["cooldownPeriod"]).To(Equal(int64(0)))
+	advanced := spec["advanced"].(map[string]any)
+	hpa := advanced["horizontalPodAutoscalerConfig"].(map[string]any)
+	behavior := hpa["behavior"].(map[string]any)
+	scaleDown := behavior["scaleDown"].(map[string]any)
+	g.Expect(scaleDown["stabilizationWindowSeconds"]).To(Equal(int64(0)))
 }

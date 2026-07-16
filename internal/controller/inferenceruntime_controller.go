@@ -19,27 +19,21 @@ package controller
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
 )
 
 type InferenceRuntimeReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=serving.hearth.dev,resources=inferenceruntimes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=serving.hearth.dev,resources=inferenceruntimes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=serving.hearth.dev,resources=inferenceruntimes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=serving.hearth.dev,resources=inferenceruntimes,verbs=get;list;watch
 
 // Reconcile is a no-op: InferenceRuntime is a passive driver consumed by reference
 // from the LLMService reconciler.
-func (r *InferenceRuntimeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+func (r *InferenceRuntimeReconciler) Reconcile(_ context.Context, _ ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 

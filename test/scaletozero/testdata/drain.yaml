@@ -32,11 +32,6 @@ spec:
     # Wide grace so a deliberately long in-flight stream finishes before SIGTERM.
     terminationGracePeriodSeconds: 90
     preStopDrain: true
-  metrics:
-    path: /metrics
-    port: http
-    queueDepth: vllm:num_requests_waiting
-    kvCacheUtil: vllm:gpu_cache_usage_perc
 ---
 apiVersion: serving.hearth.dev/v1alpha1
 kind: LLMService

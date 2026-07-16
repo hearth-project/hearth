@@ -132,9 +132,8 @@ func BuildCachePVC(svc *servingv1alpha1.LLMService) (*corev1.PersistentVolumeCla
 	return art.pvc, nil
 }
 
-// BuildPrewarmJob renders a Job that downloads weights into the cache before traffic,
-// so the first scale-from-zero loads from local disk. Returns nil when prewarm is off
-// or the strategy keeps no persistent cache. The download command assumes
+// BuildPrewarmJob renders a one-time Job that downloads weights into the cache. It returns
+// nil when prewarm is off or the strategy keeps no persistent cache. The command assumes
 // huggingface_hub / modelscope are present in the runtime image (validated at run time).
 func BuildPrewarmJob(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime, m ResolvedModel) (*batchv1.Job, error) {
 	// pvc:// weights are already on disk; there is nothing to prewarm.

@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package backend defines the vendor-neutral abstraction that lets one LLMService
-// run on any vLLM runtime (NVIDIA / Ascend / MLU). Adapters only do K8s-layer
-// adaptation — scheduling, health, model loading, metrics — never chip kernels.
+// Package backend defines vendor-neutral Kubernetes rendering for LLM runtimes.
 package backend
 
 import (
@@ -49,19 +47,11 @@ type AcceleratorRequest struct {
 	Queue string
 }
 
-type MetricsSource struct {
-	Path        string
-	PortName    string
-	QueueDepth  string
-	KVCacheUtil string
-}
-
 // BackendAdapter renders the K8s artifacts for one vendor runtime.
 type BackendAdapter interface {
 	Vendor() string
 	PodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime, m ResolvedModel) (corev1.PodSpec, error)
 	Accelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) (AcceleratorRequest, error)
-	MetricsSource(rt *servingv1alpha1.InferenceRuntime) MetricsSource
 }
 
 // Registry maps a vendor key to its adapter; new chips are new entries.
@@ -84,14 +74,12 @@ func (r *Registry) Get(vendor string) (BackendAdapter, bool) {
 
 // TemplateData is the context available to InferenceRuntime arg/env templates.
 type TemplateData struct {
-	Model       ModelData
-	Service     ServiceData
-	Accelerator AcceleratorData
+	Model   ModelData
+	Service ServiceData
 }
 
 type ModelData struct{ Path string }
 type ServiceData struct{ Name, Namespace string }
-type AcceleratorData struct{ Index string }
 
 // Render expands a Go-template string against data, failing on unknown fields.
 func Render(tmpl string, data TemplateData) (string, error) {

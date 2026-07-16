@@ -56,9 +56,8 @@ type LLMServiceReconciler struct {
 	GatewayReplicas int32
 }
 
-// +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices,verbs=get;list;watch
 // +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices/finalizers,verbs=update
 // +kubebuilder:rbac:groups=serving.hearth.dev,resources=inferenceruntimes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -166,15 +165,23 @@ func (r *LLMServiceReconciler) resolveRuntime(ctx context.Context, svc *servingv
 func pickByVendor(items []servingv1alpha1.InferenceRuntime, vendors []string) (*servingv1alpha1.InferenceRuntime, error) {
 	for _, v := range vendors {
 		var best *servingv1alpha1.InferenceRuntime
+		var tied []string
 		for i := range items {
 			if items[i].Spec.Vendor != v {
 				continue
 			}
 			if best == nil || items[i].Spec.Priority > best.Spec.Priority {
 				best = &items[i]
+				tied = []string{items[i].Name}
+			} else if items[i].Spec.Priority == best.Spec.Priority {
+				tied = append(tied, items[i].Name)
 			}
 		}
 		if best != nil {
+			if len(tied) > 1 {
+				slices.Sort(tied)
+				return nil, fmt.Errorf("multiple InferenceRuntimes match vendor %q at priority %d: %v; set spec.runtime.name", v, best.Spec.Priority, tied)
+			}
 			return best, nil
 		}
 	}
@@ -240,10 +247,15 @@ func (r *LLMServiceReconciler) updateStatus(ctx context.Context, svc *servingv1a
 	svc.Status.EndpointURL = fmt.Sprintf("http://%s.%s.svc/v1", svc.Name, svc.Namespace)
 
 	cond := metav1.Condition{Type: "Ready", ObservedGeneration: svc.Generation}
-	if phase == servingv1alpha1.PhaseReady {
+	switch phase {
+	case servingv1alpha1.PhaseReady:
 		cond.Status, cond.Reason, cond.Message = metav1.ConditionTrue, "Available", "Serving pods are ready"
-	} else {
+	case servingv1alpha1.PhaseScaledToZero:
+		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "ScaledToZero", "Backend is scaled to zero"
+	case servingv1alpha1.PhaseLoading:
 		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "Deploying", "Waiting for serving pods to become ready"
+	default:
+		cond.Status, cond.Reason, cond.Message = metav1.ConditionFalse, "Pending", "Waiting for the backend Deployment"
 	}
 	meta.SetStatusCondition(&svc.Status.Conditions, cond)
 
@@ -268,7 +280,7 @@ func (r *LLMServiceReconciler) fail(ctx context.Context, svc *servingv1alpha1.LL
 		ObservedGeneration: svc.Generation,
 	})
 	if apiequality.Semantic.DeepEqual(oldStatus, &svc.Status) {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, err
 	}
 	if uerr := r.Status().Update(ctx, svc); uerr != nil {
 		return ctrl.Result{}, uerr

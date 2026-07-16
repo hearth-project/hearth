@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-17
+
+Alpha release completing Hearth's first integrated Ascend hardware-validation cycle and hardening
+the scale-to-zero control plane based on those results. Atlas 300I Duo is verified through the
+multi-replica `0→1→2→0` lifecycle, while Ascend 910B3 is verified through the complete
+single-device `0→1→0` lifecycle. Hearth remains `v1alpha1` and is not production-ready.
+
 ### Added
 - A shared Ascend hardware-validation guide covering required images, validation levels, evidence,
   and separate 910B, Atlas 300I Duo, and Atlas 300I Pro result sets.
@@ -123,6 +130,7 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 ### Changed
 - Operator skips no-op `LLMService` status updates, avoiding optimistic-concurrency churn.
 
-[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.2.0-rc.1...HEAD
+[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hearth-project/hearth/compare/v0.2.0-rc.1...v0.2.0
 [0.2.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/hearth-project/hearth/releases/tag/v0.1.0

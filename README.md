@@ -20,11 +20,10 @@ Hearth turns "run Qwen / DeepSeek / GLM on my private cluster" into a single `LL
 manifest: declarative deployment, queue-driven autoscaling, and **scale-to-zero**, with
 NVIDIA-vLLM, vLLM-Ascend, and future runtimes as **pluggable backends** behind one API.
 
-> **Status — `v0.2.0-rc.1` (alpha).** NVIDIA is verified end to end, including multi-replica
+> **Status — `v0.2.0` (alpha).** NVIDIA is verified end to end, including multi-replica
 > scaling. Ascend is hardware-validated through the device plugin and full Hearth lifecycle on an
 > Atlas 300I Duo (`0→1→2→0`) and a single-device 910B3 (`0→1→0`). The 910B result does not cover
-> multi-replica scaling, and the supplied RC operator image has documented fixes that require a
-> rebuild; see the [910B report](docs/ascend/ascend-910b-validation.md). Hearth remains `v1alpha1` and
+> multi-replica scaling; see the [910B report](docs/ascend/ascend-910b-validation.md). Hearth remains `v1alpha1` and
 > **not production-ready** (no auth or multi-tenancy) — see the **[roadmap](ROADMAP.md)**.
 
 ## Why Hearth
@@ -63,9 +62,7 @@ a serious multi-model serving estate, **use Kthena — it's excellent.** Hearth 
 of the same axis: a handful of occasionally-used models on a handful of cards, where you want the
 smallest possible footprint — one manifest, KEDA, done. The two compose naturally on one cluster:
 **hot, high-traffic models on Kthena; the long tail scaled to zero with Hearth**, on the same
-(Volcano-schedulable) silicon. We also share operational lessons from Hearth's verified
-scale-to-zero path with Kthena's scale-to-zero design
-([kthena#1019](https://github.com/volcano-sh/kthena/issues/1019)).
+(Volcano-schedulable) silicon.
 
 ## Architecture
 
@@ -193,9 +190,9 @@ See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what
 - **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
   real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
   drain, 1→N autoscaling, Helm + dashboard.
-- **`v0.2.0-rc.1` (pre-release)** — Ascend 910B runtime and separate gateway bring-up. A subsequent
-  physical 910B3 run completed device-plugin scheduling, single-device `0→1→0`, inference, drain,
-  and reboot recovery; the report records the RC-image defects and current source fixes.
+- **`v0.2.0` (released)** — Ascend 910B3 completed device-plugin scheduling, the single-device
+  `0→1→0` lifecycle, inference, drain, and reboot recovery. Atlas 300I Duo completed the
+  multi-replica `0→1→2→0` lifecycle. The release includes the fixes found during RC validation.
 - **v1** — validate multi-device 910B and Atlas 300I Pro; complete Volcano/HAMi
   live validation, `oci://` sources, and shared caching for private delivery. Atlas 300I Duo is
   already scale-to-zero verified.

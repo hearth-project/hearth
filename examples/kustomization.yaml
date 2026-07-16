@@ -1,5 +1,7 @@
-## Append examples of your project ##
-resources:
-- ascend
-- nvidia
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Intentionally empty. Apply one device profile from a vendor subdirectory.
+resources: []
+
 # +kubebuilder:scaffold:manifestskustomizesamples

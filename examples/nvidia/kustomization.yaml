@@ -1,4 +1,0 @@
-resources:
-- serving_v1alpha1_inferenceruntime_nvidia_a100.yaml
-- serving_v1alpha1_llmservice_nvidia_a100.yaml
-- serving_v1alpha1_llmservice_nvidia_a100_hostpath.yaml

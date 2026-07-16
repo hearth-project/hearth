@@ -1,7 +1,4 @@
-# Default values for the Hearth operator chart.
-
 image:
-  # registry/repo for both images; tag defaults to the chart appVersion.
   registry: ghcr.io/hearth-project
   operator: hearth
   gateway: hearth-gateway

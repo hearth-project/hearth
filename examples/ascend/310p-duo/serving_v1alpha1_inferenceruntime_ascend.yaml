@@ -5,15 +5,11 @@ metadata:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
   name: vllm-ascend-310p-duo
-# Hardware-verified profile for Huawei Atlas 300I Duo with two Ascend 310P3
-# devices on Ubuntu. See the 310P
-# validation report for the exact tested environment and image digest.
+# Hardware-verified on an Atlas 300I Duo with two Ascend 310P3 devices.
 spec:
   family: vllm
   vendor: ascend
-  # Keep the verified 910B runtime (priority 100) ahead of this validation profile
-  # for broad vendor selectors. Validation services pin this runtime by name.
-  priority: 90
+  priority: 100
   container:
     image: quay.io/ascend/vllm-ascend:v0.22.1rc1-310p
     args:
@@ -27,7 +23,6 @@ spec:
       name: http
       containerPort: 8000
   accelerator:
-    # Standard non-mixed, whole-device resource reported by Ascend Device Plugin.
     resourceName: huawei.com/Ascend310P
     sharing:
       supported: false

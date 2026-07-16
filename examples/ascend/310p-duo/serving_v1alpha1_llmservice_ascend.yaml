@@ -16,7 +16,6 @@ spec:
       - --dtype=float16
       # 310P builds a quadratic attention mask; never rely on automatic context sizing.
       - --max-model-len=2048
-      # Establish a conservative smoke-test baseline before graph-mode tuning.
       - --enforce-eager
   resources:
     accelerators: 1

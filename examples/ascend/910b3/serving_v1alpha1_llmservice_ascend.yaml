@@ -12,7 +12,6 @@ spec:
   runtime:
     name: vllm-ascend
     argsOverride:
-      # Conservative smoke-test settings for the hardware-validated 910B3 profile.
       - --max-model-len=2048
       - --enforce-eager
   resources:

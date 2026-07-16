@@ -52,7 +52,7 @@ func loadExample[T any](t *testing.T, name string) *T {
 	return &out
 }
 
-func TestAscend910BProfile(t *testing.T) {
+func TestAscend910B3Profile(t *testing.T) {
 	g := NewWithT(t)
 	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "910b3/serving_v1alpha1_inferenceruntime_ascend.yaml")
 	svc := loadExample[servingv1alpha1.LLMService](t, "910b3/serving_v1alpha1_llmservice_ascend.yaml")

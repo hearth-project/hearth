@@ -24,7 +24,6 @@ spec:
       name: http
       containerPort: 8000
   accelerator:
-    # device visibility is set by the Ascend device plugin; Hearth only requests the resource
     resourceName: huawei.com/Ascend910
     sharing:
       supported: false

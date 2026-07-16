@@ -21,6 +21,13 @@ All notable changes to this project are documented here. The format is based on
 - Prometheus Operator resources and RBAC are decoupled from core reconciliation. Hearth now exposes
   stable metrics discovery labels while optional `ServiceMonitor` and Grafana assets live under
   `examples/observability/`.
+- Runtime metric fields are optional metadata for external observability; backend adapters and
+  autoscaling no longer carry an unused runtime-metrics dependency.
+- `InferenceRuntime` family and vendor enums now match the built-in implementations: vLLM on
+  NVIDIA or Ascend. Manager RBAC is reduced to the CRD operations used by the passive runtime and
+  service reconcilers.
+- Ascend device profiles use equal priority, so clusters with multiple installed profiles must pin
+  the intended hardware runtime instead of silently preferring 910B.
 - Runtime and service examples now live in independently deployable, vendor/device-specific
   `examples/` directories, with concise filenames that leave the device model to the directory.
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
@@ -32,6 +39,18 @@ All notable changes to this project are documented here. The format is based on
 - Ascend 310P examples invoke `vllm serve` explicitly and pin FP16 for the validated 310P3 path.
 
 ### Fixed
+- Keep retrying unchanged reconciliation failures, reject ambiguous equal-priority runtime
+  selections, and reject Volcano queue names unless the Volcano scheduler is selected.
+- Apply `scaleDownStabilization` to both KEDA's zero cooldown and HPA scale-down behavior, with
+  validation for the HPA's one-hour limit.
+- Build multi-platform images on the build host architecture and fail the `docker-buildx` target
+  when the image build fails.
+- Embed the release tag in operator and gateway images built by the release workflow.
+- Publish the release chart only after both release images build successfully.
+- Align Helm manager pod security and termination settings with the Kustomize deployment.
+- Pin Kind and KEDA in E2E workflows, install Helm explicitly, and fail CI on uncommitted module or
+  generated-file changes.
+- Make repeated Podman scale-to-zero E2E runs replace and clean their temporary image archives.
 - Reject unsupported `BakedImage` cache requests instead of silently rendering them as uncached.
 - Reject invalid PVC claim names and model paths that could escape the mounted model volume.
 - Prevent accelerator-free prewarm Pods from autoloading PyTorch vendor backends and requiring host
@@ -49,7 +68,7 @@ a schedulable NPU node and stays open. Ascend support is therefore **experimenta
 not yet "supported." Still `v1alpha1` and not production-ready.
 
 ### Added
-- **Ascend 910B validation report + bring-up runbook** ([docs/ascend-910b-validation.md](docs/ascend-910b-validation.md))
+- **Ascend 910B validation report + bring-up runbook** ([docs/ascend/ascend-910b-validation.md](docs/ascend/ascend-910b-validation.md))
   capturing the verified environment (910B2C 64 GB, CANN 9.0.0 / driver 26.0.rc1), the smoke test,
   the operator render dry-run, and the gateway data-plane results.
 

@@ -10,8 +10,8 @@ families.
 
 | Profile | Device | Validation |
 |---|---|---|
-| [`ascend/910b3`](ascend/910b3) | Ascend 910B3 (Atlas A2) | Hardware-verified single-device `0→1→0`; see the [report](../docs/ascend-910b-validation.md) |
-| [`ascend/310p-duo`](ascend/310p-duo) | Two Ascend 310P3 devices (Atlas 300I Duo) | Hardware-verified `0→1→2→0`; see the [report](../docs/ascend-310p-validation.md) |
+| [`ascend/910b3`](ascend/910b3) | Ascend 910B3 (Atlas A2) | Hardware-verified single-device `0→1→0`; see the [report](../docs/ascend/ascend-910b-validation.md) |
+| [`ascend/310p-duo`](ascend/310p-duo) | Two Ascend 310P3 devices (Atlas 300I Duo) | Hardware-verified `0→1→2→0`; see the [report](../docs/ascend/ascend-310p-validation.md) |
 | [`ascend/310p-pro`](ascend/310p-pro) | Ascend 310P (Atlas 300I Pro) | Manifest and rendering tested; physical validation is still required |
 | [`nvidia/a100`](nvidia/a100) | NVIDIA A100 | Hardware-verified end to end |
 

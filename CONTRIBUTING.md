@@ -1,8 +1,8 @@
 # Contributing to Hearth
 
 Thanks for your interest! Hearth is an early-stage, vendor-neutral Kubernetes operator for
-**declarative, scale-to-zero serving of open-source LLMs** — NVIDIA today, Ascend/MLU as the
-differentiator. It's small, moving fast, and very open to help. This guide gets you productive
+**declarative, scale-to-zero serving of open-source LLMs** — NVIDIA and Ascend today, with more
+vendors planned. It's small, moving fast, and very open to help. This guide gets you productive
 quickly.
 
 By participating you agree to uphold our [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are
@@ -24,7 +24,7 @@ side of that line.
 - **A new backend** — wire a chip as an adapter under [`internal/backend`](internal/backend) +
   golden tests. This is the project's whole thesis; high-value.
 - **Validate on real hardware** — especially the complete Ascend device-plugin and scale-to-zero
-  path. Start with the [Ascend validation guide](docs/ascend-validation.md).
+  path. Start with the [Ascend validation guide](docs/ascend/ascend-validation.md).
 - **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P1/P2** items
   (`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
   and the **community track** (the KEDA external push scaler, #42) are great entry points.
@@ -96,7 +96,8 @@ Commit the regenerated files alongside your change.
 
 1. **Branch** off `main`; keep PRs small and focused (one concern).
 2. **Tests** — add/extend unit or golden tests; adapters in particular should be golden-tested so
-   they're provable without hardware. `make test` and `make lint` must pass.
+   their rendered workloads are reviewable without hardware. Hardware support still requires a
+   real-accelerator validation report. `make test` and `make lint` must pass.
 3. **Regenerate** manifests/CRDs if you touched API types (see above).
 4. **Commit style** — short, imperative, [Conventional Commits](https://www.conventionalcommits.org/)
    prefixes (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`), scoped where useful
@@ -105,7 +106,8 @@ Commit the regenerated files alongside your change.
    surrounding style.
 6. **Describe the change** and how you tested it (incl. hardware, if any).
 
-CI runs build + lint + tests on every PR; green is required before review.
+CI runs Helm validation, lint, unit/envtest, manager E2E, and scale-to-zero E2E checks; green is
+required before review.
 
 ## Reporting bugs & proposing features
 

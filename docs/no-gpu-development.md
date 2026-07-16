@@ -17,14 +17,14 @@ plane against a cluster.
 | Lint | `make lint` | `golangci-lint` (run before every PR) |
 | Control-plane reconcile | `make install && make run` | operator turns an `LLMService` into its child objects (see CONTRIBUTING) |
 
-Adapters are deliberately golden-tested so a new backend is *provable without the hardware* — see
-`internal/backend/*/`.
+Adapter rendering is testable without hardware, but support claims require validation on a real
+accelerator. Rendering tests live under `internal/backend/*/`.
 
 ## The `vllm-stub`
 
-`test/vllm-stub/` is a CPU-only fake of a vLLM OpenAI server. It exposes exactly the surfaces the
-gateway and the metrics scraper talk to, so the whole gateway + KEDA scale-to-zero path can run on
-kind with no GPU:
+`test/vllm-stub/` is a CPU-only fake of a vLLM OpenAI server. It exposes the surfaces used by the
+gateway and optional observability checks, so the gateway + KEDA scale-to-zero path can run on kind
+with no GPU:
 
 - **`/health`** — returns `503` until `STUB_STARTUP_DELAY` has elapsed since boot, then `200`. This
   drives the gateway's cold-start keepalive and `activationTimeout` paths (mimics vLLM only going
@@ -86,7 +86,7 @@ API, so no device plugin), and runs the operator out-of-cluster.
 **Prerequisites you provide:** a running Kind cluster (current kube-context) with **KEDA** installed:
 
 ```bash
-helm install keda kedacore/keda -n keda --create-namespace
+helm install keda kedacore/keda --version 2.20.1 -n keda --create-namespace
 ```
 
 **Run it** (builds + loads the stub and gateway images, then runs the suite):

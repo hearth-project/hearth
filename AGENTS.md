@@ -4,7 +4,7 @@
 
 Hearth is a Kubernetes orchestration and lifecycle layer for scale-to-zero LLM serving. It owns
 declarative deployment, runtime selection, model loading and caching, health, accelerator
-scheduling, autoscaling integration, and metrics.
+scheduling, autoscaling integration, and stable metrics surfaces.
 
 Keep changes on that boundary. Hearth does not implement inference kernels, device plugins,
 schedulers, or a fleet-level serving platform. Vendor-specific inference behavior belongs in vLLM
@@ -15,8 +15,8 @@ The API group is `serving.hearth.dev/v1alpha1`:
 - `LLMService` is namespaced and describes the model, runtime selection, resources, caching,
   scaling, and endpoint behavior.
 - `InferenceRuntime` is cluster-scoped and describes a reusable runtime image, accelerator,
-  scheduling, probes, lifecycle, and metrics. Its controller is intentionally passive; the
-  `LLMService` reconciler consumes it.
+  scheduling, probes, lifecycle, and optional metric metadata. Its controller is intentionally
+  passive; the `LLMService` reconciler consumes it.
 
 Read `docs/architecture.md` before changing component boundaries and `CONTRIBUTING.md` before
 changing contributor workflows.
@@ -37,6 +37,7 @@ changing contributor workflows.
 | `config/` | Kustomize deployment and generated CRDs/RBAC |
 | `examples/<vendor>/<device>/` | Independently deployable hardware-specific profiles |
 | `examples/observability/` | Optional Prometheus and Grafana integration assets |
+| `docs/ascend/` | Hardware-validation evidence and product-specific runbooks |
 | `charts/hearth/` | Manually maintained Helm chart; CRDs are synchronized from `config/crd/bases/` |
 | `test/e2e/` | Isolated Kind manager E2E suite (`e2e` build tag) |
 | `test/scaletozero/` | KEDA + gateway + CPU stub scale-to-zero E2E suite (`e2e` build tag) |

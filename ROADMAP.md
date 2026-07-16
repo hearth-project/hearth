@@ -15,7 +15,7 @@ production-grade release. It's a living document.
 Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and multi-node) and on kind:
 
 - **Declarative deploy** — one `LLMService` renders Deployment + Services + KEDA `ScaledObject` +
-  `ServiceMonitor` + cache + prewarm Job, with owner-ref cascade.
+  optional cache and prewarm resources, with owner-ref cascade.
 - **Scale-to-zero** — KEDA holds the backend at 0 when idle; a request wakes it.
 - **Cold-start handling** — gateway buffers the request, emits SSE **keepalive heartbeats** so
   clients/ingress don't time out, holds until the model is loaded, then streams real tokens.
@@ -25,15 +25,16 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
 - **Model caching + prewarm** — `HostPath` and `NodeLocalPVC` (incl. pinnable `storageClassName`,
   verified against Alibaba ESSD); weights hydrated before first traffic.
 - **Graceful drain** — in-flight streams finish before a scale-down SIGTERM.
-- **Observability** — Prometheus scrapes gateway + vLLM `/metrics` via `ServiceMonitor`.
+- **Observability** — gateway and vLLM metrics have stable discovery labels; an independent,
+  opt-in `ServiceMonitor` and Grafana dashboard live under `examples/observability/`.
 - **Packaging** — Helm chart installs operator + RBAC; verified reconciling under chart RBAC.
 - **Multi-backend abstraction** — NVIDIA implemented and run; **Ascend 910B3** is verified through
   the device plugin, gateway, KEDA, cache, drain, and reboot recovery on one physical device. The
   completed topology was `0→1→0`; multi-replica scaling needs a multi-device server
-  (see [Ascend 910B validation](docs/ascend-910b-validation.md)).
+  (see [Ascend 910B validation](docs/ascend/ascend-910b-validation.md)).
 - **Ascend 310P lifecycle** — Atlas 300I Duo is verified through the device plugin and Hearth
   gateway, including `0→1→2→0`, backpressure, reject mode, drain, caching, and reboot recovery
-  (see [Ascend 310P validation](docs/ascend-310p-validation.md)). Atlas 300I Pro remains
+  (see [Ascend 310P validation](docs/ascend/ascend-310p-validation.md)). Atlas 300I Pro remains
   rendering-tested only.
 - **No-GPU CI loop** — the full `0→1→N→0` scale-to-zero e2e (CPU `vllm-stub` + a fake extended
   resource on kind) runs in CI; contributing needs no accelerator.
@@ -54,7 +55,7 @@ anything requiring auth, SLAs, or stability guarantees.
 ### Now — finish domestic hardware coverage
 
 - **Complete the Ascend 910B loop.** Status after the 2026-07-15 physical run with the RC images (see
-  [Ascend 910B validation](docs/ascend-910b-validation.md)):
+  [Ascend 910B validation](docs/ascend/ascend-910b-validation.md)):
 
   - [x] vLLM-Ascend serves on a real 910B (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
   - [x] Operator renders correct 910B manifests (`huawei.com/Ascend910`, driver mounts, cache, probes).
@@ -70,7 +71,7 @@ anything requiring auth, SLAs, or stability guarantees.
   streaming inference, bounded-queue backpressure, reject mode, graceful drain, cache persistence,
   self-heal, Helm upgrade, and reboot recovery.
 - [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
-  the [310P report and runbook](docs/ascend-310p-validation.md).
+  the [310P report and runbook](docs/ascend/ascend-310p-validation.md).
 - [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
   is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi sharing /
   gang scheduling follows.
@@ -138,5 +139,5 @@ README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positio
 - **No auth, no multi-tenancy, no quotas.**
 - **Ascend claims are stack- and topology-specific** — the 910B3 result verifies the integrated
   single-device `0→1→0` path, not multi-replica scaling or every 910B variant. Atlas 300I Duo is
-  verified for its recorded stack; Atlas 300I Pro and MLU are manifest-only.
+  verified for its recorded stack; Atlas 300I Pro is manifest-only, and MLU is not implemented.
 - **`v1alpha1`** — breaking API changes expected before `v1beta1`.

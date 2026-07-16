@@ -24,7 +24,7 @@ NVIDIA-vLLM, vLLM-Ascend, and future runtimes as **pluggable backends** behind o
 > scaling. Ascend is hardware-validated through the device plugin and full Hearth lifecycle on an
 > Atlas 300I Duo (`0→1→2→0`) and a single-device 910B3 (`0→1→0`). The 910B result does not cover
 > multi-replica scaling, and the supplied RC operator image has documented fixes that require a
-> rebuild; see the [910B report](docs/ascend-910b-validation.md). Hearth remains `v1alpha1` and
+> rebuild; see the [910B report](docs/ascend/ascend-910b-validation.md). Hearth remains `v1alpha1` and
 > **not production-ready** (no auth or multi-tenancy) — see the **[roadmap](ROADMAP.md)**.
 
 ## Why Hearth
@@ -120,14 +120,15 @@ cache, scaling, and endpoint fields stay the same. **That portability is the who
 
 ## Multi-backend, by design
 
-Backends are described declaratively in a cluster-scoped `InferenceRuntime` (image, args, accelerator
-resource, probes, metrics). Adapter **code** is thin because the differences are data:
+Backends are described declaratively in a cluster-scoped `InferenceRuntime` (image, arguments,
+accelerator resource, probes, and optional metric metadata). Adapter code remains thin because the
+differences are data:
 
 | Backend | Engine | Accelerator | v0 status |
 |---|---|---|---|
 | `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
-| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 hardware-validated preview — single-device 910B3 `0→1→0`, inference, drain, and reboot recovery verified; multi-replica scaling untested ([report](docs/ascend-910b-validation.md)) |
-| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | ✅ Atlas 300I Duo scale-to-zero verified on two physical 310P3 devices; Atlas 300I Pro remains rendering-tested ([report and runbook](docs/ascend-310p-validation.md)) |
+| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 hardware-validated preview — single-device 910B3 `0→1→0`, inference, drain, and reboot recovery verified; multi-replica scaling untested ([report](docs/ascend/ascend-910b-validation.md)) |
+| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | ✅ Atlas 300I Duo scale-to-zero verified on two physical 310P3 devices; Atlas 300I Pro remains rendering-tested ([report and runbook](docs/ascend/ascend-310p-validation.md)) |
 | `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
 
 Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).
@@ -158,9 +159,9 @@ with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
 
 ## Install
 
-> **Alpha.** Each release publishes the operator + gateway images and the chart to
-> `ghcr.io/hearth-project`, so install is one command — no building required. Still alpha and **not
-> production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
+> **Alpha.** Each release publishes the operator and gateway images to `ghcr.io/hearth-project` and
+> attaches a packaged chart to the GitHub release. No image build is required. Hearth is still
+> **not production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
 
 Hearth needs **KEDA** for scale-to-zero. Monitoring is independent: Hearth exposes metrics and
 stable discovery labels but never installs or reconciles Prometheus or Grafana resources. See the
@@ -169,7 +170,7 @@ optional [`examples/observability`](examples/observability) package.
 ```bash
 # 1. KEDA (required for autoscaling / scale-to-zero)
 helm repo add kedacore https://kedacore.github.io/charts
-helm install keda kedacore/keda -n keda --create-namespace
+helm install keda kedacore/keda --version 2.20.1 -n keda --create-namespace
 
 # 2. Hearth (CRDs + RBAC + operator). The chart defaults to the published
 #    ghcr.io/hearth-project images at this version — no --set needed.

@@ -7,9 +7,10 @@ NVIDIA, Ascend, and other accelerators.
 ## Boundary (what Hearth is, and isn't)
 
 Hearth owns the **Kubernetes orchestration / lifecycle layer**: rendering workloads, model loading,
-health, scheduling adaptation, scale-to-zero, and metrics. It deliberately does **not** re-implement
-the inference engine (that's **vLLM** + vendor plugins) or write chip kernels / device plugins /
-schedulers (that's the vendors, **HAMi**, **Volcano**). Fleet routing, prefill/decode disaggregation,
+health, scheduling adaptation, scale-to-zero, and stable metrics surfaces. It deliberately does
+**not** re-implement the inference engine (that's **vLLM** + vendor plugins) or write chip kernels /
+device plugins / schedulers (that's the vendors, **HAMi**, **Volcano**). Fleet routing,
+prefill/decode disaggregation,
 and datacenter scale-out belong to **Kthena**, **AIBrix**, and **KServe**/**llm-d**; Hearth composes
 with them as the lightweight, scale-to-zero end of that axis (see the
 README's ["Hearth and Kthena"](../README.md#hearth-and-kthena)). A new accelerator is a thin
@@ -25,7 +26,7 @@ API group `serving.hearth.dev/v1alpha1`.
 - **`InferenceRuntime`** (cluster-scoped, reusable) — a *pluggable backend driver*: container image +
   templated args, the device-plugin resource name (e.g. `nvidia.com/gpu`, `huawei.com/Ascend910`),
   scheduling (nodeSelector/tolerations/scheduler), model-load-aware probes, lifecycle (drain), and
-  where the LLM-aware metrics live. This is the multi-backend differentiator.
+  optional runtime metric metadata. This is the multi-backend differentiator.
 
 ## Components
 
@@ -33,8 +34,8 @@ API group `serving.hearth.dev/v1alpha1`.
   `InferenceRuntime`) into the child objects below via server-side apply, gracefully skipping the
   optional KEDA CRD when absent.
 - **Backend abstraction** (`internal/backend`) — a `BackendAdapter` interface + registry. Shared code
-  renders the vLLM pod, accelerator request, and metrics source; thin NVIDIA and Ascend adapters
-  add vendor specifics. Adapters are golden-tested, so they're provable without hardware.
+  renders the vLLM pod and accelerator request; thin NVIDIA and Ascend adapters add vendor
+  specifics. Adapters are rendering-tested without claiming hardware validation.
 - **Gateway** (`internal/gateway`) — the data plane: an OpenAI-compatible reverse proxy in front of
   each `LLMService`. It buffers requests during cold start, applies bounded-queue backpressure,
   emits SSE keepalive heartbeats (or fast-rejects), drains in-flight streams on scale-down, and
@@ -93,8 +94,8 @@ flowchart LR
    `pending` count, and holds the connection. In `keepalive` mode it streams SSE heartbeats so the
    client/ingress don't time out; in `reject` mode it returns `503 + Retry-After` and the client retries.
 3. **Activation** — KEDA's `metrics-api` trigger polls the gateway's `/hearth/queue`; `pending > 0`
-   drives the Deployment **0 → 1**. The pod loads weights from the local cache (prewarmed) and only
-   becomes **Ready** once the model is loaded (load-gated readiness probes).
+   drives the Deployment **0 → 1**. The pod loads weights from the local cache when prewarming has
+   completed and only becomes **Ready** once the model is loaded (load-gated readiness probes).
 4. **Serve** — the gateway forwards the buffered request and streams tokens back.
 5. **Scale up** — sustained queue depth above the per-replica target scales **1 → N** (one whole
    device per replica).
@@ -117,5 +118,7 @@ read-only and skips prewarming. Node-local caches are per-node today;
 `SharedPVC` (RWX) for multi-node is on the roadmap.
 Prewarm Pods inherit the runtime's node selector, tolerations, and scheduler but do not consume an
 accelerator.
+Cache PVCs and prewarm Jobs are create-once resources because their workload fields are immutable;
+changing the model or cache configuration requires explicitly replacing the affected resource.
 For clusters without a dynamic StorageClass, see the NVIDIA A100 HostPath example in
 [`examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml`](../examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml).

@@ -22,12 +22,9 @@ rules:
 - apiGroups: [batch]
   resources: [jobs]
   verbs: [create, delete, get, list, patch, update, watch]
-# Optional integrations: Hearth degrades gracefully if these CRDs are absent.
+# Optional autoscaling integration: Hearth degrades gracefully if this CRD is absent.
 - apiGroups: [keda.sh]
   resources: [scaledobjects]
-  verbs: [create, delete, get, list, patch, update, watch]
-- apiGroups: [monitoring.coreos.com]
-  resources: [servicemonitors]
   verbs: [create, delete, get, list, patch, update, watch]
 - apiGroups: [serving.hearth.dev]
   resources: [inferenceruntimes, llmservices]

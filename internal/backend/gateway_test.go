@@ -64,3 +64,24 @@ func TestGatewayPointsAtBackendService(t *testing.T) {
 	}
 	g.Expect(backendURL).To(Equal("http://qwen3-8b-backend.ai.svc:80"))
 }
+
+func TestServicesExposeMetricsDiscoveryContract(t *testing.T) {
+	g := NewWithT(t)
+	svc := gatewaySvc()
+	rt := &servingv1alpha1.InferenceRuntime{Spec: servingv1alpha1.InferenceRuntimeSpec{
+		Container: servingv1alpha1.RuntimeContainer{
+			Port: servingv1alpha1.RuntimePort{Name: "runtime-http", ContainerPort: 8000},
+		},
+	}}
+
+	services := []*corev1.Service{
+		backend.BuildBackendService(svc, rt),
+		backend.BuildGatewayService(svc),
+	}
+	for _, service := range services {
+		g.Expect(service.Labels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "hearth"))
+		g.Expect(service.Labels).To(HaveKeyWithValue("serving.hearth.dev/llmservice", svc.Name))
+		g.Expect(service.Spec.Ports).To(HaveLen(1))
+		g.Expect(service.Spec.Ports[0].Name).To(Equal("http"))
+	}
+}

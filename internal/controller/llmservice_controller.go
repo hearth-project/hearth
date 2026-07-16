@@ -64,7 +64,6 @@ type LLMServiceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services;persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=keda.sh,resources=scaledobjects,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
@@ -133,9 +132,6 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.applyOptional(ctx, &svc, so, "ScaledObject (autoscaling disabled)"); err != nil {
 		return r.fail(ctx, &svc, "ApplyScaledObject", err)
 	}
-	if err := r.applyOptional(ctx, &svc, backend.BuildServiceMonitor(&svc), "ServiceMonitor (metrics scraping disabled)"); err != nil {
-		return r.fail(ctx, &svc, "ApplyServiceMonitor", err)
-	}
 
 	var live appsv1.Deployment
 	if err := r.Get(ctx, client.ObjectKeyFromObject(dep), &live); err != nil {
@@ -199,9 +195,8 @@ func (r *LLMServiceReconciler) apply(ctx context.Context, owner *servingv1alpha1
 	return r.Apply(ctx, ac, fieldOwner, client.ForceOwnership)
 }
 
-// applyOptional SSA-applies an unstructured dependency (KEDA ScaledObject, Prometheus
-// ServiceMonitor). If its CRD is absent, it logs skipMsg and continues rather than
-// failing reconcile, so Hearth runs without those optional operators installed.
+// applyOptional SSA-applies an unstructured dependency. If its CRD is absent, it logs
+// skipMsg and continues so Hearth can run without the optional integration installed.
 func (r *LLMServiceReconciler) applyOptional(ctx context.Context, owner *servingv1alpha1.LLMService, obj *unstructured.Unstructured, skipMsg string) error {
 	if err := controllerutil.SetControllerReference(owner, obj, r.Scheme); err != nil {
 		return err

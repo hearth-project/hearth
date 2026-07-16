@@ -54,7 +54,7 @@ func gatewaySelectorLabels(svc *servingv1alpha1.LLMService) map[string]string {
 }
 
 // gatewayServiceLabels are the gateway Service's metadata labels: the selector labels
-// plus the shared llmservice label so one ServiceMonitor selects gateway + backend.
+// plus the shared llmservice label used for external metrics discovery.
 func gatewayServiceLabels(svc *servingv1alpha1.LLMService) map[string]string {
 	l := gatewaySelectorLabels(svc)
 	l[llmServiceLabel] = svc.Name

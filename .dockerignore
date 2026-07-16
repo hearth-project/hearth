@@ -1,5 +1,3 @@
-# Copy the source tree into the build context, excluding only VCS, build output,
-# locally-installed tooling, and test artifacts.
 .git/
 bin/
 dist/

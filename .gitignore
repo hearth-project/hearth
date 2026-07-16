@@ -1,6 +1,3 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -13,7 +10,6 @@
 bin/
 # Stray binary from `go build ./test/vllm-stub/` (build to bin/ instead).
 /vllm-stub
-Dockerfile.cross
 
 # Distribution artifacts from `make build-installer` / helm packaging.
 # Ignore dist/ contents (not the dir itself) so the installer can be re-included.
@@ -29,9 +25,6 @@ dist/*
 coverage.*
 *.coverprofile
 profile.cov
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
 
 # Go workspace file
 go.work
@@ -51,8 +44,3 @@ Thumbs.db
 .vscode/
 *.swp
 *~
-
-# Test / coverage artifacts
-cover.out
-*.out
-coverage.*

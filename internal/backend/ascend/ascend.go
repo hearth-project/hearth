@@ -54,7 +54,3 @@ func (a *Adapter) PodSpec(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.I
 func (a *Adapter) Accelerator(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) (backend.AcceleratorRequest, error) {
 	return backend.WholeDeviceAccelerator(svc, rt)
 }
-
-func (a *Adapter) MetricsSource(rt *servingv1alpha1.InferenceRuntime) backend.MetricsSource {
-	return backend.MetricsFromRuntime(rt)
-}

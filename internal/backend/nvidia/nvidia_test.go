@@ -84,7 +84,6 @@ func TestPodSpecRendersContainer(t *testing.T) {
 	c := pod.Containers[0]
 	g.Expect(c.Name).To(Equal(backend.ServingContainerName))
 	g.Expect(c.Image).To(Equal("vllm/vllm-openai:v0.22.0"))
-	// runtime args are rendered, then the service override is appended
 	g.Expect(c.Args).To(Equal([]string{
 		"--model=Qwen/Qwen3-8B-Instruct",
 		"--served-model-name=qwen3-8b",
@@ -96,7 +95,6 @@ func TestPodSpecRendersContainer(t *testing.T) {
 	g.Expect(c.Resources.Requests).To(HaveKey(corev1.ResourceCPU))
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceMemory))
 
-	// shared-memory volume is mounted for vLLM
 	g.Expect(c.VolumeMounts).To(ContainElement(corev1.VolumeMount{Name: "dshm", MountPath: "/dev/shm"}))
 	g.Expect(pod.Volumes).To(HaveLen(1))
 	g.Expect(pod.Volumes[0].EmptyDir.Medium).To(Equal(corev1.StorageMediumMemory))
@@ -117,12 +115,10 @@ func TestBuildDeploymentAssembles(t *testing.T) {
 	dep, err := backend.BuildDeployment(nvidia.New(), sampleService(), sampleRuntime(), resolvedModel())
 	g.Expect(err).NotTo(HaveOccurred())
 
-	// the operator does not own replicas; KEDA's HPA does (scale-to-zero handoff)
 	g.Expect(dep.Spec.Replicas).To(BeNil())
 	g.Expect(dep.Spec.Selector.MatchLabels).To(HaveKeyWithValue("serving.hearth.dev/llmservice", "qwen3-8b"))
 	g.Expect(dep.Spec.Template.Labels).To(HaveKeyWithValue("serving.hearth.dev/runtime", "vllm-nvidia"))
 
-	// accelerator merged into the serving container limits
 	c := dep.Spec.Template.Spec.Containers[0]
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceName("nvidia.com/gpu")))
 }
@@ -137,10 +133,18 @@ func TestBuildDeploymentRendersVolcanoQueue(t *testing.T) {
 	g.Expect(dep.Spec.Template.Spec.SchedulerName).To(Equal("volcano"))
 	g.Expect(dep.Spec.Template.Annotations).To(HaveKeyWithValue("scheduling.volcano.sh/queue-name", "inference"))
 
-	// without a queue, no Volcano annotation is rendered
 	plain, err := backend.BuildDeployment(nvidia.New(), sampleService(), sampleRuntime(), resolvedModel())
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(plain.Spec.Template.Annotations).NotTo(HaveKey("scheduling.volcano.sh/queue-name"))
+}
+
+func TestBuildDeploymentRejectsQueueWithoutVolcano(t *testing.T) {
+	g := NewWithT(t)
+	rt := sampleRuntime()
+	rt.Spec.Accelerator.Scheduler.Queue = "inference"
+
+	_, err := backend.BuildDeployment(nvidia.New(), sampleService(), rt, resolvedModel())
+	g.Expect(err).To(MatchError(ContainSubstring("scheduler.name=volcano")))
 }
 
 func TestPodSpecRejectsBadTemplate(t *testing.T) {

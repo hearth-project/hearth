@@ -61,8 +61,6 @@ func resolved() backend.ResolvedModel {
 	return backend.ResolvedModel{Path: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"}
 }
 
-// TestSameFrameworkRendersAscend is the multi-backend proof: the same CRD + builder
-// renders a correct NPU pod with zero Ascend hardware.
 func TestSameFrameworkRendersAscend(t *testing.T) {
 	g := NewWithT(t)
 	dep, err := backend.BuildDeployment(ascend.New(), ascendService(), ascendRuntime(), resolved())
@@ -72,7 +70,6 @@ func TestSameFrameworkRendersAscend(t *testing.T) {
 	g.Expect(c.Image).To(Equal("quay.io/ascend/vllm-ascend:v0.21.0rc1"))
 	g.Expect(c.Args[:3]).To(Equal([]string{"vllm", "serve", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"}))
 
-	// the NPU resource comes from the runtime, not adapter code
 	g.Expect(c.Resources.Limits).To(HaveKey(corev1.ResourceName("huawei.com/Ascend910")))
 	g.Expect(dep.Spec.Template.Spec.NodeSelector).To(HaveKeyWithValue("accelerator", "huawei-Ascend910"))
 }
@@ -86,9 +83,9 @@ func TestAscendProjectsDriverMounts(t *testing.T) {
 	for _, v := range pod.Volumes {
 		volNames[v.Name] = true
 	}
-	g.Expect(volNames).To(HaveKey("dshm"))    // shared base still applies
-	g.Expect(volNames).To(HaveKey("npu-smi")) // ascend-specific
-	g.Expect(volNames).To(HaveKey("dcmi"))    // ascend-specific
+	g.Expect(volNames).To(HaveKey("dshm"))
+	g.Expect(volNames).To(HaveKey("npu-smi"))
+	g.Expect(volNames).To(HaveKey("dcmi"))
 	g.Expect(volNames).To(HaveKey("ascend-driver"))
 
 	c := pod.Containers[0]

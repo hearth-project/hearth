@@ -93,7 +93,6 @@ func TestHoldsThenForwardsOnColdStart(t *testing.T) {
 	srv := httptest.NewServer(be.handler())
 	defer srv.Close()
 
-	// backend becomes ready shortly after the request arrives
 	go func() {
 		time.Sleep(40 * time.Millisecond)
 		be.ready.Store(true)
@@ -135,14 +134,12 @@ func TestBackpressureReturns429WhenQueueFull(t *testing.T) {
 	fe := httptest.NewServer(newGateway(t, srv.URL, 1, time.Second).Handler())
 	defer fe.Close()
 
-	// occupy the single slot with a request that blocks in the backend handler
 	go func() {
 		resp, err := http.Post(fe.URL+"/v1/hold", "application/json", nil)
 		if err == nil {
 			_ = resp.Body.Close()
 		}
 	}()
-	// wait until the holder has been admitted (pending == 1)
 	g.Eventually(func() int64 { return queuePending(fe.URL) }).Should(Equal(int64(1)))
 
 	resp, err := http.Post(fe.URL+"/v1/second", "application/json", nil)
@@ -287,7 +284,6 @@ func TestRejectModeReturns503AndKeepsDemand(t *testing.T) {
 	g.Expect(resp.StatusCode).To(Equal(http.StatusServiceUnavailable))
 	g.Expect(resp.Header.Get("Retry-After")).NotTo(BeEmpty())
 
-	// Even though the request returned immediately, demand lingers so the scaler activates.
 	g.Expect(queuePending(fe.URL)).To(Equal(int64(1)))
 }
 

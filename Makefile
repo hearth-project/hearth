@@ -1,27 +1,20 @@
-# Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/hearth-project/hearth:latest
-# YEAR defines the year value used for substituting the YEAR placeholder in the boilerplate header.
 YEAR ?= $(shell date +%Y)
 # VERSION is injected into manager and gateway binaries. Tagged builds use the
 # nearest git tag, while local builds fall back to dev outside a git checkout.
 VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo dev)
 LDFLAGS ?= -X main.version=$(VERSION)
 
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# CONTAINER_TOOL defines the container tool to be used for building images.
-# Be aware that the target commands are only tested with Docker which is
-# scaffolded by default. However, you might want to replace it to use other
-# tools. (i.e. podman)
+# Set to podman where Docker is unavailable.
 CONTAINER_TOOL ?= docker
 
-# Setting SHELL to bash allows bash commands to be executed by recipes.
-# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+# Fail recipes on command or pipeline errors.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
@@ -29,17 +22,6 @@ SHELL = /usr/bin/env bash -o pipefail
 all: build
 
 ##@ General
-
-# The help target prints out all targets with their descriptions organized
-# beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk command is responsible for reading the
-# entire set of makefiles included in this invocation, looking for lines of the
-# file as xyz: ## something, and then pretty-format the target and help. Then,
-# if there's a line with ##@ something, that gets pretty-printed as a category.
-# More info on the usage of ANSI control characters for terminal formatting:
-# https://en.wikipedia.org/wiki/ANSI_escape_code#SGR_parameters
-# More info on the awk command:
-# http://linuxcommand.org/lc3_adv_awk.php
 
 .PHONY: help
 help: ## Display this help.
@@ -67,11 +49,6 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
-# The E2E suite uses Kind and loads the manager image locally.
-# kubectl kuberc is disabled by default for test isolation; enable with:
-# - KUBECTL_KUBERC=true
-# CertManager is installed by default; skip with:
-# - CERT_MANAGER_INSTALL_SKIP=true
 KIND_CLUSTER ?= hearth-test-e2e
 
 .PHONY: setup-test-e2e
@@ -97,19 +74,22 @@ test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expect
 cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
 
-# --- No-GPU scale-to-zero e2e (gateway + KEDA loop on the CPU vllm-stub) ---
 # Assumes a running Kind cluster (current kube-context) with KEDA already installed.
 SCALE_KIND_CLUSTER ?= kind
 SCALE_GATEWAY_IMG ?= hearth.dev/hearth-gateway:e2e
+SCALE_STUB_ARCHIVE ?= /tmp/hearth-stub.tar
+SCALE_GATEWAY_ARCHIVE ?= /tmp/hearth-gateway.tar
 
 .PHONY: load-scale-images
 load-scale-images: ## Build the stub + gateway images and load them into the Kind cluster (CONTAINER_TOOL-agnostic).
 	$(CONTAINER_TOOL) build -f Dockerfile.stub -t $(STUB_IMG) .
 	$(CONTAINER_TOOL) build -f Dockerfile.gateway -t $(SCALE_GATEWAY_IMG) .
-	$(CONTAINER_TOOL) save $(STUB_IMG) -o /tmp/hearth-stub.tar
-	$(KIND) load image-archive /tmp/hearth-stub.tar --name $(SCALE_KIND_CLUSTER)
-	$(CONTAINER_TOOL) save $(SCALE_GATEWAY_IMG) -o /tmp/hearth-gateway.tar
-	$(KIND) load image-archive /tmp/hearth-gateway.tar --name $(SCALE_KIND_CLUSTER)
+	rm -f "$(SCALE_STUB_ARCHIVE)" "$(SCALE_GATEWAY_ARCHIVE)"
+	$(CONTAINER_TOOL) save $(STUB_IMG) -o "$(SCALE_STUB_ARCHIVE)"
+	$(KIND) load image-archive "$(SCALE_STUB_ARCHIVE)" --name $(SCALE_KIND_CLUSTER)
+	$(CONTAINER_TOOL) save $(SCALE_GATEWAY_IMG) -o "$(SCALE_GATEWAY_ARCHIVE)"
+	$(KIND) load image-archive "$(SCALE_GATEWAY_ARCHIVE)" --name $(SCALE_KIND_CLUSTER)
+	rm -f "$(SCALE_STUB_ARCHIVE)" "$(SCALE_GATEWAY_ARCHIVE)"
 
 .PHONY: test-scale-e2e
 test-scale-e2e: manifests generate load-scale-images ## Run the no-GPU scale-to-zero e2e (needs a Kind cluster with KEDA).
@@ -138,9 +118,6 @@ build: manifests generate fmt vet ## Build manager and gateway binaries.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
-# If you wish to build the manager image targeting other platforms you can use the --platform flag.
-# (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
-# More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build --build-arg VERSION=$(VERSION) -t ${IMG} .
@@ -169,22 +146,14 @@ docker-build-stub: ## Build the CPU vllm-stub image used by the no-GPU e2e harne
 helm-crds: manifests ## Sync generated CRDs into the Helm chart's crds/ directory.
 	cp config/crd/bases/*.yaml charts/hearth/crds/
 
-# PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
-# architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
-# - be able to use docker buildx. More info: https://docs.docker.com/build/buildx/
-# - have enabled BuildKit. More info: https://docs.docker.com/develop/develop-images/build_enhancements/
-# - be able to push the image to your registry (i.e. if you do not set a valid value via IMG=<myregistry/image:<tag>> then the export will fail)
-# To adequately provide solutions that are compatible with multiple platforms, you should consider using this option.
+# docker-buildx builds and pushes every listed platform.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
-	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
-	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name hearth-builder
 	$(CONTAINER_TOOL) buildx use hearth-builder
-	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --build-arg VERSION=$(VERSION) --tag ${IMG} -f Dockerfile.cross .
+	$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --build-arg VERSION=$(VERSION) --tag ${IMG} .
 	- $(CONTAINER_TOOL) buildx rm hearth-builder
-	rm Dockerfile.cross
 
 .PHONY: build-installer
 build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
@@ -236,12 +205,12 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 KUSTOMIZE_VERSION ?= v5.8.1
 CONTROLLER_TOOLS_VERSION ?= v0.21.0
 
-#ENVTEST_VERSION is the controller-runtime version to use for setup-envtest, derived from go.mod
+# Derived from the controller-runtime module version.
 ENVTEST_VERSION ?= $(shell v='$(call gomodver,sigs.k8s.io/controller-runtime)'; \
   [ -n "$$v" ] || { echo "Set ENVTEST_VERSION manually (controller-runtime replace has no tag)" >&2; exit 1; }; \
   printf '%s\n' "$$v")
 
-#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+# Derived from the Kubernetes API module version.
 ENVTEST_K8S_VERSION ?= $(shell v='$(call gomodver,k8s.io/api)'; \
   [ -n "$$v" ] || { echo "Set ENVTEST_K8S_VERSION manually (k8s.io/api replace has no tag)" >&2; exit 1; }; \
   printf '%s\n' "$$v" | sed -E 's/^v?[0-9]+\.([0-9]+).*/1.\1/')
@@ -280,10 +249,7 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
 	} || true
 
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary
-# $2 - package url which can be installed
-# $3 - specific version of package
+# Install and version-pin a local Go tool: target, package, version.
 define go-install-tool
 @[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
 set -e; \

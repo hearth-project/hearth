@@ -34,12 +34,10 @@ func gatewaySvc() *servingv1alpha1.LLMService {
 func TestGatewayReplicasDefaultAndOverride(t *testing.T) {
 	g := NewWithT(t)
 
-	// non-positive falls back to the default (1, for crisp scale-from-zero)
 	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 0)
 	g.Expect(dep.Spec.Replicas).NotTo(BeNil())
 	g.Expect(*dep.Spec.Replicas).To(Equal(int32(1)))
 
-	// an explicit value is respected (HA opt-in)
 	dep = backend.BuildGatewayDeployment(gatewaySvc(), "img", 3)
 	g.Expect(*dep.Spec.Replicas).To(Equal(int32(3)))
 }
@@ -84,4 +82,38 @@ func TestServicesExposeMetricsDiscoveryContract(t *testing.T) {
 		g.Expect(service.Spec.Ports).To(HaveLen(1))
 		g.Expect(service.Spec.Ports[0].Name).To(Equal("http"))
 	}
+}
+
+type serviceMonitorFixture struct {
+	Spec struct {
+		Endpoints []struct {
+			Path string `json:"path"`
+			Port string `json:"port"`
+		} `json:"endpoints"`
+		Selector struct {
+			MatchLabels      map[string]string `json:"matchLabels"`
+			MatchExpressions []struct {
+				Key      string `json:"key"`
+				Operator string `json:"operator"`
+			} `json:"matchExpressions"`
+		} `json:"selector"`
+	} `json:"spec"`
+}
+
+func TestOptionalObservabilityAssetsMatchDiscoveryContract(t *testing.T) {
+	g := NewWithT(t)
+	monitor := decodeExample[serviceMonitorFixture](t,
+		"../../examples/observability/prometheus/servicemonitor.yaml")
+	g.Expect(monitor.Spec.Endpoints).To(HaveLen(1))
+	g.Expect(monitor.Spec.Endpoints[0].Path).To(Equal("/metrics"))
+	g.Expect(monitor.Spec.Endpoints[0].Port).To(Equal("http"))
+	g.Expect(monitor.Spec.Selector.MatchLabels).To(HaveKeyWithValue("app.kubernetes.io/managed-by", "hearth"))
+	g.Expect(monitor.Spec.Selector.MatchExpressions).To(ContainElement(And(
+		HaveField("Key", "serving.hearth.dev/llmservice"),
+		HaveField("Operator", "Exists"),
+	)))
+
+	dashboard := decodeExample[map[string]any](t,
+		"../../examples/observability/grafana/hearth-overview.json")
+	g.Expect(dashboard).To(HaveKeyWithValue("uid", "hearth-overview"))
 }

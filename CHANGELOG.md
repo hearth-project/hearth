@@ -22,7 +22,7 @@ All notable changes to this project are documented here. The format is based on
   stable metrics discovery labels while optional `ServiceMonitor` and Grafana assets live under
   `examples/observability/`.
 - Runtime and service examples now live in independently deployable, vendor/device-specific
-  `examples/` directories, with filenames that identify the validated device model.
+  `examples/` directories, with concise filenames that leave the device model to the directory.
 - Prewarm Jobs inherit the runtime's node selector, tolerations, scheduler, and Volcano queue so
   node-local model data is prepared where the backend can run.
 - `LLMService` resources are reconciled when a matching `InferenceRuntime` changes.

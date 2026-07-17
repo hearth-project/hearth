@@ -86,9 +86,8 @@ kubectl get llmservice -n ai
 `ai` namespace. If several equal-priority runtimes for the same vendor are installed, pin
 `spec.runtime.name`; Hearth deliberately rejects an ambiguous vendor-only selection.
 
-For a cluster without a dynamic StorageClass, use the profile's HostPath service as documented in
-[`examples/README.md`](../examples/README.md). HostPath is node-local and is intended for controlled
-clusters where that tradeoff is acceptable.
+All bundled profiles use `NodeLocalPVC`. If the cluster has no default StorageClass, set
+`cache.storageClassName` to a dynamic StorageClass before applying the profile.
 
 ## Understand the LLMService
 

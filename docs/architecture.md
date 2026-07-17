@@ -120,5 +120,3 @@ Prewarm Pods inherit the runtime's node selector, tolerations, and scheduler but
 accelerator.
 Cache PVCs and prewarm Jobs are create-once resources because their workload fields are immutable;
 changing the model or cache configuration requires explicitly replacing the affected resource.
-For clusters without a dynamic StorageClass, see the NVIDIA A100 HostPath example in
-[`examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml`](../examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml).

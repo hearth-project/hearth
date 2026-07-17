@@ -24,14 +24,8 @@ kubectl apply -k examples/ascend/310p-duo -n ai
 ```
 
 `InferenceRuntime` is cluster-scoped; `LLMService` is created in the namespace selected by `-n`.
-The default NVIDIA profile uses `NodeLocalPVC`. On a cluster without a dynamic StorageClass, apply
-the A100 runtime and HostPath service explicitly instead:
-
-```bash
-kubectl apply -f examples/nvidia/a100/serving_v1alpha1_inferenceruntime_nvidia.yaml
-kubectl apply -n ai \
-  -f examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia_hostpath.yaml
-```
+All bundled service profiles use `NodeLocalPVC`. Ensure the cluster has a default dynamic
+StorageClass, or set `cache.storageClassName` before applying a profile.
 
 ## Optional observability
 

@@ -4,7 +4,7 @@
 
 **A minimal, composable LLM serving control plane for private Kubernetes clusters.**
 
-Declarative, vendor-neutral, scale-to-zero serving across NVIDIA, Ascend, and more.
+Declarative, scale-to-zero LLM serving for NVIDIA and Ascend runtimes.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/github/go-mod/go-version/hearth-project/hearth)](go.mod)
@@ -12,46 +12,40 @@ Declarative, vendor-neutral, scale-to-zero serving across NVIDIA, Ascend, and mo
 [![CI](https://github.com/hearth-project/hearth/actions/workflows/test.yml/badge.svg)](https://github.com/hearth-project/hearth/actions/workflows/test.yml)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-[**Quickstart**](#quickstart) · [**Architecture**](docs/architecture.md) · [**Observability**](docs/observability.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
+[**Install**](#install) · [**Quickstart**](#quickstart) · [**Documentation**](docs/README.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
 
 </div>
 
-Hearth turns "run Qwen / DeepSeek / GLM on my private cluster" into a single `LLMService`
-manifest: declarative deployment, queue-driven autoscaling, and **scale-to-zero**, with
-NVIDIA-vLLM, vLLM-Ascend, and future runtimes as **pluggable backends** behind one API.
+Hearth turns a model and a runtime choice into a Kubernetes deployment with model caching,
+queue-driven autoscaling, and scale-to-zero. `LLMService` is the workload API;
+cluster administrators provide reusable `InferenceRuntime` profiles for the accelerators available
+in their cluster.
 
-> **Status — `v0.2.0` (alpha).** NVIDIA is verified end to end, including multi-replica
-> scaling. Ascend is hardware-validated through the device plugin and full Hearth lifecycle on an
-> Atlas 300I Duo (`0→1→2→0`) and a single-device 910B3 (`0→1→0`). The 910B result does not cover
-> multi-replica scaling; see the [910B report](docs/ascend/ascend-910b-validation.md). Hearth remains `v1alpha1` and
-> **not production-ready** (no auth or multi-tenancy) — see the **[roadmap](ROADMAP.md)**.
+> **Status — alpha.** Hardware validation covers NVIDIA A100, the two-device Atlas 300I Duo
+> (`0→1→2→0`), and a single-device Ascend 910B3 (`0→1→0`). Results are specific to the
+> recorded hardware and software stacks. Atlas 300I Pro remains rendering-tested only. The API is
+> `v1alpha1`, and Hearth is not production-ready for shared or customer-facing workloads.
 
 ## Why Hearth
 
-The "LLM on K8s" space has excellent **platforms**: [KServe](https://kserve.github.io/website/) +
-[llm-d](https://llm-d.ai/) at datacenter scale, [AIBrix](https://github.com/vllm-project/aibrix) as
-vLLM's control plane, and [Kthena](https://github.com/volcano-sh/kthena) for fleet-grade serving.
-Hearth focuses on the smaller end: serving a few open-source LLMs well on a few accelerators while
-composing with the Kubernetes infrastructure already in the cluster.
+- **Scale-to-zero is the center of gravity.** An always-on gateway holds or rejects cold requests
+  while KEDA activates the model backend; idle models consume no accelerators.
+- **One workload API, reusable runtime profiles.** Application owners describe the model and
+  scaling intent. Cluster administrators define images, device resources, scheduling, and probes.
+- **Thin vendor integration.** Most hardware differences are declarative runtime data; small
+  NVIDIA and Ascend adapters translate the remaining Kubernetes-specific behavior.
+- **Optional integrations stay optional.** KEDA is required for autoscaling and scale-to-zero, but
+  basic reconciliation continues without it. Prometheus and Grafana are independent, opt-in
+  integrations.
 
-- **One user-facing CRD + KEDA.** No router fleet, no webhook suite, no new autoscaler to learn —
-  if KEDA runs on your cluster, you're most of the way there. Degrades gracefully when KEDA is
-  absent; Prometheus and Grafana are completely independent, opt-in integrations.
-- **Scale-to-zero is the center of gravity.** Idle models hold **zero** accelerators; a small
-  gateway buffers the cold-start request and KEDA wakes the backend.
-- **Vendor-neutral, domestic-silicon-friendly.** The same manifest runs on NVIDIA or Ascend;
-  backends are *data*, not code. Private/"XinChuang" delivery is a first-class concern.
-- **Small enough to audit** in an afternoon (~5K lines of Go), light enough for edge boxes and
-  air-gapped clusters.
-
-**What Hearth does — and deliberately does not do:**
-
-| Layer | Owner | Hearth |
+| Layer | Owner | Hearth's role |
 |---|---|---|
-| Inference engine | vLLM (+ `vllm-ascend` / `vllm-mlu`) | **Uses it.** Never re-implements; writes no chip kernels. |
-| GPU/NPU scheduling | device plugins, **HAMi**, **Volcano** | **Builds on.** Targets their resources; never replaces them. |
-| Fleet routing, P/D disaggregation, and datacenter scale-out | **Kthena**, **AIBrix**, **KServe**/**llm-d** | **Composes with them.** Hearth remains the lightweight control plane for smaller deployments. |
-| Declarative lifecycle + scale-to-zero + vendor-neutral packaging, at the small end | — | **This is Hearth.** |
+| Inference engine | vLLM and vLLM-Ascend | Runs it; does not implement kernels or inference engines. |
+| Accelerator discovery and scheduling | Vendor device plugins and optional Kubernetes schedulers | Consumes advertised resources and runtime scheduling configuration. |
+| Fleet routing and datacenter-scale serving | Kthena, AIBrix, KServe, llm-d, and similar platforms | Stays outside this scope; Hearth can coexist as a smaller scale-to-zero control plane. |
+| Model lifecycle and scale-to-zero | Hearth | Reconciles serving workloads, caching, gateways, and KEDA autoscaling. |
+
+See [Architecture](docs/architecture.md) for the complete boundary and reconciliation model.
 
 ### Hearth and Kthena
 
@@ -66,149 +60,92 @@ smallest possible footprint — one manifest, KEDA, done. The two compose natura
 
 ## Architecture
 
-`LLMService` (what to serve + how to scale) + `InferenceRuntime` (a pluggable backend) → the operator
-renders a vLLM `Deployment` + `Service`, a model cache, and a KEDA `ScaledObject` that scales on the
-pending-request count of a small Hearth gateway, which buffers requests during cold start.
+One `LLMService` consumes one cluster-scoped `InferenceRuntime` and reconciles to a backend
+Deployment and Service, a gateway Deployment and Service, optional cache and prewarm resources,
+and a KEDA `ScaledObject` when KEDA is installed.
 
 ```mermaid
 flowchart LR
-  client(["client"]) -->|OpenAI API| gw["Hearth Gateway"]
-  gw -->|forward when Ready| pods["vLLM pods (0..N)"]
-  keda["KEDA"] -->|"poll /hearth/queue"| gw
-  keda -->|"scale 0..N"| pods
-  pods -.->|load weights| cache[("cache")]
+  client([Client]) -->|OpenAI API| gateway[Hearth gateway]
+  gateway --> backend[Model backend 0..N]
+  keda[KEDA] -->|Poll queue| gateway
+  keda -->|Scale| backend
+  backend -.-> cache[(Model cache)]
 ```
 
-📖 See [`docs/architecture.md`](docs/architecture.md) for components, CRDs, and the full
-scale-to-zero data flow — and [`docs/observability.md`](docs/observability.md) for the dashboard.
-
-## A 60-second example
-
-```yaml
-apiVersion: serving.hearth.dev/v1alpha1
-kind: LLMService
-metadata:
-  name: qwen3-8b
-  namespace: ai
-spec:
-  model:
-    source:
-      uri: modelscope://Qwen/Qwen3-8B-Instruct   # hf:// | modelscope:// | pvc://
-  runtime:
-    selector: { vendor: [nvidia, ascend] }        # auto-pick a backend, in preference order
-  resources:
-    accelerators: 1
-  scaling:
-    min: 0            # scale-to-zero
-    max: 3
-    metric: queueDepth
-    target: 10
-```
-
-```console
-$ kubectl apply -f qwen3-8b.yaml
-$ kubectl get llmservice -n ai
-NAME       PHASE          RUNTIME       REPLICAS   AGE
-qwen3-8b   ScaledToZero   vllm-nvidia   0          30s
-```
-
-The same `LLMService` shape runs on Ascend by selecting `vllm-ascend` by name or vendor. The model,
-cache, scaling, and endpoint fields stay the same. **That portability is the whole point.**
-
-## Multi-backend, by design
-
-Backends are described declaratively in a cluster-scoped `InferenceRuntime` (image, arguments,
-accelerator resource, probes, and optional metric metadata). Adapter code remains thin because the
-differences are data:
-
-| Backend | Engine | Accelerator | v0 status |
-|---|---|---|---|
-| `vllm-nvidia` | NVIDIA-vLLM | `nvidia.com/gpu` | ✅ implemented + verified on GPU |
-| `vllm-ascend` | vLLM-Ascend | `huawei.com/Ascend910` | 🧪 hardware-validated preview — single-device 910B3 `0→1→0`, inference, drain, and reboot recovery verified; multi-replica scaling untested ([report](docs/ascend/ascend-910b-validation.md)) |
-| `vllm-ascend-310p-*` | vLLM-Ascend | `huawei.com/Ascend310P` | ✅ Atlas 300I Duo scale-to-zero verified on two physical 310P3 devices; Atlas 300I Pro remains rendering-tested ([report and runbook](docs/ascend/ascend-310p-validation.md)) |
-| `vllm-mlu` (Cambricon) | vLLM-MLU | `cambricon.com/mlu` | 🗺️ planned |
-
-Adding a chip is a small adapter, not a rewrite — see [`internal/backend`](internal/backend).
-
-## Quickstart
-
-> Try the control plane on **kind — no GPU required**.
-
-```bash
-# 1. install the CRDs into your current kube-context
-make install
-
-# 2. run the operator against that context
-make run
-
-# 3. register a backend + a service
-kubectl create namespace ai
-kubectl apply -k examples/nvidia/a100 -n ai
-
-# 4. watch it reconcile (backend pod stays Pending without a GPU — expected)
-kubectl get llmservice,deploy,svc -n ai
-```
-
-This exercises the control plane: the operator reconciles an `LLMService` into its child objects. The
-gateway and backend pods start once you point the operator at a built gateway image
-(`go run ./cmd/main.go --gateway-image=<your-registry>/hearth-gateway:<version>`) and provide an accelerator node
-with the device plugin. A spot-GPU walkthrough is coming to [`docs/`](docs).
+The gateway exposes the demand signal, buffers requests during cold start, and forwards them once
+the model is ready. See the [architecture guide](docs/architecture.md) for the full data flow.
 
 ## Install
 
-> **Alpha.** Each release publishes the operator and gateway images to `ghcr.io/hearth-project` and
-> attaches a packaged chart to the GitHub release. No image build is required. Hearth is still
-> **not production-ready** (no auth, no multi-tenancy); see the [roadmap](ROADMAP.md).
-
-Hearth needs **KEDA** for scale-to-zero. Monitoring is independent: Hearth exposes metrics and
-stable discovery labels but never installs or reconciles Prometheus or Grafana resources. See the
-optional [`examples/observability`](examples/observability) package.
+Hearth requires Kubernetes 1.29 or newer, `kubectl`, and Helm. Install KEDA when you need
+autoscaling or scale-to-zero. Drivers and device plugins are hardware prerequisites and are not
+installed by Hearth.
 
 ```bash
-# 1. KEDA (required for autoscaling / scale-to-zero)
-helm repo add kedacore https://kedacore.github.io/charts
-helm install keda kedacore/keda --version 2.20.1 -n keda --create-namespace
+HEARTH_VERSION=0.2.0
 
-# 2. Hearth (CRDs + RBAC + operator). The chart defaults to the published
-#    ghcr.io/hearth-project images at this version — no --set needed.
-helm install hearth ./charts/hearth -n hearth-system --create-namespace
+helm repo add kedacore https://kedacore.github.io/charts --force-update
+helm upgrade --install keda kedacore/keda \
+  --version 2.20.1 \
+  --namespace keda \
+  --create-namespace
 
-# 3. register a backend and deploy a model
-kubectl apply -k examples/nvidia/a100
-kubectl get llmservice -w
+helm upgrade --install hearth \
+  "https://github.com/hearth-project/hearth/releases/download/v${HEARTH_VERSION}/hearth-${HEARTH_VERSION}.tgz" \
+  --namespace hearth-system \
+  --create-namespace
+
+kubectl rollout status deployment/hearth-controller-manager -n hearth-system
 ```
 
-> **Upgrading from a `kubectl apply` CRD install?** Helm v4 applies CRDs via Server-Side Apply and
-> conflicts with CRDs previously installed by `kubectl apply` (e.g. `make install`). Either delete
-> them first — `kubectl delete crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev`
-> — or install CRDs with `kubectl apply --server-side` so both tools share a field manager.
+This installs the CRDs, RBAC, operator, and the version-matched operator and gateway image
+configuration. See [Getting started](docs/getting-started.md) for source-checkout installation,
+upgrade considerations, and cleanup.
 
-## Roadmap
+## Quickstart
 
-See **[ROADMAP.md](ROADMAP.md)** for the prioritized path to production and what v0 is (and isn't) good for.
+Choose exactly one profile matching the installed accelerator device plugin. This A100 example
+also expects a default dynamic StorageClass with at least 60 GiB available and access to
+ModelScope:
 
-- **v0 — `v0.1.0` (released)** — multi-backend abstraction on NVIDIA, **verified end-to-end on
-  real GPUs**: model caching/prewarm, gateway + KEDA scale-to-zero, cold-start keepalive, graceful
-  drain, 1→N autoscaling, Helm + dashboard.
-- **`v0.2.0` (released)** — Ascend 910B3 completed device-plugin scheduling, the single-device
-  `0→1→0` lifecycle, inference, drain, and reboot recovery. Atlas 300I Duo completed the
-  multi-replica `0→1→2→0` lifecycle. The release includes the fixes found during RC validation.
-- **v1** — validate multi-device 910B and Atlas 300I Pro; complete Volcano/HAMi
-  live validation, `oci://` sources, and shared caching for private delivery. Atlas 300I Duo is
-  already scale-to-zero verified.
-- **v2** — Cambricon/Hygon; LoRA; air-gapped "XinChuang" offline bundle.
+```bash
+HEARTH_VERSION=0.2.0
+PROFILE_URL="https://github.com/hearth-project/hearth//examples/nvidia/a100?ref=v${HEARTH_VERSION}"
 
-> **Not production-ready yet** — no auth, no multi-tenancy, `v1alpha1` API. It's a strong fit today
-> for **internal/dev, latency-tolerant, cost-sensitive** serving (scale-to-zero packs many idle models
-> onto few GPUs). See the roadmap's production-readiness section before exposing it to real users.
+kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n ai -k "${PROFILE_URL}"
+
+kubectl get inferenceruntime vllm-nvidia
+kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
+```
+
+The profile installs a cluster-scoped runtime and a namespaced `LLMService`. Its prewarm Job first
+downloads the model; the first request then activates the backend from zero. Follow the
+[LLMService walkthrough](docs/getting-started.md#understand-the-llmservice) to call the endpoint and
+observe the lifecycle.
+
+For other devices, select a profile from [`examples/`](examples). To exercise the full loop without
+an accelerator, use the [no-GPU development guide](docs/no-gpu-development.md).
+
+## Documentation
+
+- [Getting started](docs/getting-started.md) — installation, profile selection, inference, upgrades,
+  and cleanup.
+- [Architecture](docs/architecture.md) — component boundaries and the scale-to-zero data flow.
+- [CRD reference](docs/crd-reference.md) — `LLMService` and `InferenceRuntime` fields.
+- [Hardware profiles](examples/README.md) — available devices and their validation level.
+- [Ascend validation](docs/ascend/ascend-validation.md) — exact stacks, evidence, and product-specific
+  runbooks.
+- [Observability](docs/observability.md) — optional Prometheus and Grafana integration.
+- [Roadmap](ROADMAP.md) — current limitations and the path to production readiness.
 
 ## Contributing
 
-Hearth is early and moving fast — contributions, issues, and ideas are very welcome, especially
-**validating the remaining Ascend profiles on real NPUs** and the [roadmap](ROADMAP.md)'s "Now"/P1 items. Start with
-**[CONTRIBUTING.md](CONTRIBUTING.md)** and please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
-To report a vulnerability, see [SECURITY.md](SECURITY.md).
+Contributions, bug reports, and hardware-validation results are welcome. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md), follow the [Code of Conduct](CODE_OF_CONDUCT.md), and report
+security issues through [SECURITY.md](SECURITY.md).
 
 ## License
 
-Licensed under [**Apache-2.0**](LICENSE).
+Licensed under the [Apache License 2.0](LICENSE).

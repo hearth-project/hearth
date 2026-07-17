@@ -2,8 +2,7 @@
 
 A minimal, composable LLM serving control plane for private Kubernetes clusters.
 
-> Early and growing. Start here; more guides, including a spot-GPU walkthrough, are on the way.
-
+- [Getting started](getting-started.md) — install a release, select a hardware profile, send a request, upgrade, and clean up.
 - [Architecture](architecture.md) — components, the two CRDs, and the scale-to-zero data flow.
 - [Ascend hardware validation](ascend/ascend-validation.md) — shared prerequisites, validation levels, and required evidence.
 - [Ascend 910B validation](ascend/ascend-910b-validation.md) — verified single-device scale-to-zero result, exact stack, defects, and runbook.

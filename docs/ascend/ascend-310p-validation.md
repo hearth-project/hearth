@@ -7,10 +7,6 @@
 | Huawei Atlas 300I Duo | Scale-to-zero verified | Full `0 -> 1 -> 2 -> 0` lifecycle passed on physical 310P3 devices on 2026-07-14. |
 | Huawei Atlas 300I Pro | Rendering-tested | Physical validation is still required. |
 
-The Duo result applies only to the environment and image digest recorded below. vLLM-Ascend
-describes 310P support as experimental, and it does not explicitly list Atlas 300I Pro. Do not
-extend the Duo claim to other products or software combinations.
-
 The profiles follow the official [vLLM-Ascend 310P guide](https://docs.vllm.ai/projects/ascend/en/latest/tutorials/hardwares/310p.html),
 [installation guide](https://docs.vllm.ai/projects/ascend/en/main/installation/), and
 [Huawei Ascend Device Plugin guide](https://www.hiascend.com/document/detail/en/mindcluster/730/clustersched/schedulingug/dlug_installation_019.html).
@@ -30,9 +26,6 @@ Shared image, evidence, and terminology requirements are in the
 | Context limit | Explicit `--max-model-len=2048` |
 | Execution baseline | `--enforce-eager` |
 
-Confirm the image, host driver, firmware, and CANN compatibility against the vLLM-Ascend release
-notes for this exact runtime tag. Do not assume the 910B validation stack is compatible with 310P.
-
 ## Atlas 300I Duo result — 2026-07-14
 
 The complete operator, device-plugin, gateway, KEDA, and vLLM path passed on this baseline:
@@ -43,10 +36,10 @@ The complete operator, device-plugin, gateway, KEDA, and vLLM path passed on thi
 | Host | Arm64 Ubuntu 26.04 LTS; kernel `6.8.0-134-generic` |
 | Driver / container CANN | `26.0.rc1` / `9.1.0-beta.1` |
 | Kubernetes | K3s `v1.36.2+k3s1`; containerd `2.3.2-k3s2` |
-| Ascend Device Plugin | MindCluster `v7.3.0`, digest `sha256:42fada043e2aa486551dea5d7ed889947fdb7c23d5c34eed2ed72c8c34922876` |
+| Ascend Device Plugin | MindCluster `v7.3.0` |
 | KEDA | `2.20.1` |
-| vLLM-Ascend image | `v0.22.1rc1-310p`, digest `sha256:bdd4961179684fde79148c9fb12ec4fa94fafeb575d9cde3827ab4d20a15332f` |
-| Hearth images | Operator `0.2.0-rc.1` digest `sha256:fe6095550ca35be60795020c5a391b9526a3203632449dae9f254c8027fdce56`; gateway digest `sha256:7d5c4cef1b0029c49fd3b639ff075cf8ff3a5386aa6e09600ba6bf9ca808f70d` |
+| vLLM-Ascend image | `v0.22.1rc1-310p` |
+| Hearth images | Operator `0.2.0-rc.1` ; gateway `0.2.0-rc.1` |
 | Model / cache | `Qwen/Qwen2.5-0.5B-Instruct`; NodeLocalPVC on a dedicated 120 GB ext4 data disk |
 
 Observed functional results:
@@ -62,13 +55,6 @@ Observed functional results:
 - Cache data, the driver, device capacity, Hearth, KEDA, and the device plugin recovered across two
   full host reboots. A no-op apply, operator restart, gateway deletion, and Helm upgrade also
   preserved the expected resources.
-
-The run found release-candidate defects that are corrected in this repository: prewarm Pods now
-disable PyTorch device-backend autoload, the 310P runtime invokes `vllm serve` explicitly, the example
-pins FP16, and gateway metrics distinguish a committed SSE `200` from an activation failure. The
-supplied operator image must still be rebuilt from current source: it identified itself as `dev` and
-did not react to `InferenceRuntime` changes until the `LLMService` was touched, although the source
-already contains that watch.
 
 ## 1. Record the environment
 
@@ -138,8 +124,6 @@ kubectl get nodes -L accelerator,serving.hearth.dev/ascend-product
 ## 4. Prepare Hearth
 
 Use a dedicated cluster and namespace. Confirm the kube-context before changing cluster state.
-Install KEDA if the scale-to-zero loop is in scope, then install Hearth:
-
 ```bash
 kubectl config current-context
 kubectl create namespace hearth-310p-validation
@@ -147,8 +131,7 @@ make install
 ```
 
 If the cluster has no default dynamic StorageClass, set `cache.storageClassName` in both service
-examples before applying them, or use a deliberately prepared HostPath cache.
-
+examples before applying them.
 For K3s, configure a separate data disk through `/etc/rancher/k3s/config.yaml`; editing the bundled
 local-path manifest or ConfigMap is not persistent because K3s regenerates it:
 

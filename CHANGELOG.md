@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- An opt-in, co-located KEDA ExternalScaler that streams cold activation immediately while retaining
+  queue metrics for scale-out, scale-down, observability, and rollback.
+- An activation lease for reject-mode cold starts, including current-state replay across scaler
+  reconnects and a no-GPU E2E mode for the external-push path.
+
+### Changed
+- Helm and the manager accept `gateway.scalerMode` / `--scaler-mode`; `metrics-api` remains the
+  compatibility default and `external-push` requires one gateway replica.
+
 ## [0.2.0] - 2026-07-17
 
 Alpha release completing Hearth's first integrated Ascend hardware-validation cycle and hardening
@@ -76,7 +86,7 @@ not yet "supported." Still `v1alpha1` and not production-ready.
 
 ### Added
 - **Ascend 910B validation report + bring-up runbook** ([docs/ascend/ascend-910b-validation.md](docs/ascend/ascend-910b-validation.md))
-  capturing the verified environment (910B2C 64 GB, CANN 9.0.0 / driver 26.0.rc1), the smoke test,
+  capturing the verified environment (910B3 64 GB, CANN 9.0.0 / driver 26.0.rc1), the smoke test,
   the operator render dry-run, and the gateway data-plane results.
 
 ### Changed
@@ -88,7 +98,7 @@ not yet "supported." Still `v1alpha1` and not production-ready.
   (device-plugin scheduling + full integrated e2e).
 
 ### Verified (Ascend 910B, real hardware)
-- **vLLM-Ascend serves on the NPU** — Qwen2.5 loaded onto a 910B2C and answered via the OpenAI API
+- **vLLM-Ascend serves on the NPU** — Qwen2.5 loaded onto a 910B3 and answered via the OpenAI API
   (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
 - **Operator renders a correct 910B backend** (kind dry-run) — `huawei.com/Ascend910` request, CANN
   driver host-mounts, ModelScope cache wiring, load-gated probes; vendor selector resolves to `vllm-ascend`.

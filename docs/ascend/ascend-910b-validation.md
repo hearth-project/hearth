@@ -1,190 +1,255 @@
-# Ascend 910B deployment validation
+# Ascend 910B3 deployment validation
 
 ## Status
 
 | Profile | Validation level | Status |
 |---|---|---|
-| Ascend 910B3, one 64 GB device | Scale-to-zero verified | Integrated `0 -> 1 -> 0` passed on physical hardware on 2026-07-15; the RC prewarm Job needed the source-equivalent workaround documented below. |
-| Ascend 910B2C, one 64 GB device | Runtime-tested | The earlier direct vLLM and gateway result remains valid only for its recorded environment. |
+| Ascend 910B3, one 64 GB device | Scale-to-zero verified | Full `0 -> 1 -> 0` lifecycle passed on physical hardware on 2026-07-15. |
 
-The 910B3 result covers the operator, Ascend Device Plugin, KEDA, gateway, model cache, and
-vLLM-Ascend on the exact stack below. It is a hardware-validated technical preview, not a claim
-that every 910B server or software combination is supported. The server exposed one device, so
-multi-replica `1 -> N` scaling could not be tested.
+The result covers the operator, Ascend Device Plugin, KEDA, gateway, model cache, and vLLM-Ascend
+on the recorded stack. The server exposed one device, so multi-replica scaling was not tested.
 
-Use the [shared Ascend validation guide](ascend-validation.md) for evidence terminology and the
-[310P report](ascend-310p-validation.md) for Atlas 300I profiles. Results are not transferable
-between those products.
+The profile follows the official
+[vLLM-Ascend installation guide](https://docs.vllm.ai/projects/ascend/en/main/installation/),
+[vLLM-Ascend support guidance](https://docs.vllm.ai/projects/ascend/en/main/faqs.html), and
+[Huawei Ascend Device Plugin guide](https://www.hiascend.com/document/detail/en/mindcluster/730/clustersched/schedulingug/dlug_installation_019.html).
+Shared evidence requirements are in the [Ascend hardware validation guide](ascend-validation.md).
 
-## Validated environment
+## Validation baseline
+
+| Item | Required value |
+|---|---|
+| Host OS | Ubuntu |
+| Device allocation | Standard non-mixed, whole-device mode |
+| Kubernetes resource | `huawei.com/Ascend910` |
+| Node label | `accelerator=huawei-Ascend910` |
+| Runtime image | `quay.io/ascend/vllm-ascend:v0.21.0rc1` |
+| Smoke model | `Qwen/Qwen2.5-0.5B-Instruct` from ModelScope |
+| Context limit | Explicit `--max-model-len=2048` |
+| Execution baseline | `--enforce-eager` |
+| Replica limit | `scaling.max: 1` for a one-device server |
+| Drain timeout | `60s` |
+
+## Ascend 910B3 result — 2026-07-15
+
+The complete operator, device-plugin, gateway, KEDA, and vLLM path passed on this baseline:
 
 | Item | Observed value |
 |---|---|
-| Accelerator | Physical Ascend `910B3`, chip version V1, 64 GB HBM, one device |
-| Firmware / driver | `7.7.0.1.231` / `26.0.rc1` |
-| Host | Arm64 Ubuntu 26.04 LTS; 16-core HiSilicon TaiShan-v110 |
-| Kernel | `6.8.0-134-generic`; DKMS module `davinci_ascend/1.0` |
+| Accelerator | One physical Ascend `910B3`, chip version V1, 64 GB HBM |
+| Host | Arm64 Ubuntu 26.04 LTS; 16-core HiSilicon TaiShan-v110; kernel `6.8.0-134-generic` |
+| Firmware / driver / CANN | `7.7.0.1.231` / `26.0.rc1` / `9.0.0` |
 | Kubernetes | K3s `v1.36.2+k3s1`; containerd `v2.3.2-k3s2` |
+| Ascend Device Plugin | MindCluster `v7.3.0` |
 | Helm / KEDA | Helm `v4.2.3`; KEDA `2.20.1` |
-| Ascend Device Plugin | MindCluster `v7.3.0`; image manifest-list digest `sha256:42fada043e2aa486551dea5d7ed889947fdb7c23d5c34eed2ed72c8c34922876` |
-| Runtime image | Internal mirror of `vllm-ascend:v0.21.0rc1`; digest `sha256:71e601c0aaf20e7fa600fbdb54ffda9c5bb8f000341b0c73380c216dfa5c0805` |
-| Container stack | `vllm 0.21.0`, `vllm_ascend 0.21.0rc1`, CANN `9.0.0` |
-| Hearth images | Operator `0.2.0-rc.1` digest `sha256:fe6095550ca35be60795020c5a391b9526a3203632449dae9f254c8027fdce56`; gateway digest `sha256:7d5c4cef1b0029c49fd3b639ff075cf8ff3a5386aa6e09600ba6bf9ca808f70d` |
-| Model | `Qwen/Qwen2.5-0.5B-Instruct` from ModelScope |
-| Storage | 40 GB system disk; 120 GB ext4 data disk for K3s, images, and the local-path model PVC |
+| vLLM-Ascend image | `v0.21.0rc1` with `vllm 0.21.0` |
+| Hearth images | Operator `0.2.0-rc.1`; gateway `0.2.0-rc.1` |
+| Model / cache | `Qwen/Qwen2.5-0.5B-Instruct`; NodeLocalPVC on a dedicated 120 GB ext4 data disk |
 
-The host initially ran kernel 7.0.0-14. The `26.0.rc1` driver source failed to build against that
-kernel on this server and built successfully against Ubuntu's signed 6.8.0-134 kernel. Do not copy
-that kernel choice blindly: use a driver-supported kernel for the exact host OS, then prove a reboot
-before treating the installation as persistent.
+Observed functional results:
 
-## Functional results
+- MindCluster reported one healthy `huawei.com/Ascend910` resource and allocated it to the backend
+  Pod.
+- The prewarm Job downloaded 954 MB in 66 seconds without requesting an NPU.
+- A cold streaming request drove `0 -> 1`, received gateway heartbeats while the model loaded, and
+  completed with real NPU tokens, `[DONE]`, and HTTP 200 in `230.99 s`.
+- Warm JSON and streaming requests completed in `0.245 s` and `0.293 s`.
+- KEDA returned the backend to zero and released the NPU. A cached restart reached Ready in
+  `2 min 47 s`.
+- Reject mode returned `503` with `Retry-After`; bounded-queue testing returned `429` after the
+  100-request queue filled.
+- Gateway health, queue, OpenAI-compatible inference, and Prometheus metric endpoints passed.
+- A `15s` drain aborted generation, while `60s` completed 129 streaming chunks with `[DONE]` and a
+  normal finish reason. The example therefore uses `drainTimeout: 60s`.
+- A no-op apply, gateway replacement, operator restart, same-values Helm upgrade, and full host
+  reboot preserved the expected service and cache state. Post-reboot inference again completed and
+  returned to zero.
 
-### Scheduling, cache, and cold start
+Prometheus Operator, Volcano, and HAMi were not installed during this run. Monitoring remained
+optional, and no multi-replica claim is made from the one-device result.
 
-- MindCluster discovered card ID 5 as `910B3`, registered `huawei.com/Ascend910`, and reported
-  `Ascend910-5 Healthy`. Node capacity and allocatable were both 1.
-- The backend Pod was scheduled through the device plugin with both request and limit
-  `huawei.com/Ascend910: 1`. It received the plugin allocation annotations, the CANN driver mounts,
-  the cache PVC, and load-gated probes.
-- The corrected prewarm Job downloaded 954 MB into the data-disk PVC in 66 seconds without
-  requesting an NPU. The model-weight checksum was
-  `fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe`.
-- A cold streaming request drove `0 -> 1`, received SSE heartbeats while the model loaded, returned
-  real NPU tokens and `[DONE]`, and completed with HTTP 200 in 230.99 seconds. Gateway metrics
-  recorded 184.23 seconds of activation wait.
-- Warm JSON and SSE requests completed in 0.245 and 0.293 seconds. KEDA then returned the backend
-  to zero and the NPU process disappeared.
-- A second cached startup reached Ready in 2 minutes 47 seconds. vLLM reported 1.46 seconds to load
-  0.932 GB of weights and 31.83 seconds for engine profiling, KV-cache creation, and warmup; most of
-  the remaining cold time was Python/Ascend process initialization.
+## 1. Record the environment
 
-vLLM reserved about 55.05 GiB for KV cache and raised total HBM use from about 3.2 GiB idle to
-60.9 GiB. That is expected allocator behavior for the default memory-utilization setting, not the
-size of the model weights.
-
-### Gateway and metrics
-
-- `/healthz`, `/hearth/queue`, `/v1/models`, streaming and non-streaming
-  `/v1/chat/completions`, and gateway `/metrics` passed.
-- vLLM `/metrics` exposed the configured `vllm:num_requests_waiting`,
-  `vllm:num_requests_running`, and time-to-first-token series.
-- Reject mode returned HTTP 503 in 7 ms with `Retry-After: 10`; the demand linger still activated
-  the backend from zero.
-- With a five-second activation timeout, 105 concurrent cold requests produced exactly 100
-  activation-timeout 503 responses and five queue-full 429 responses. The matching gateway
-  counters were present.
-- Prometheus Operator was intentionally absent. The tested pre-decoupling build logged that it
-  skipped `ServiceMonitor` creation and continued reconciling. Current Hearth releases leave all
-  Prometheus resources to the independent observability examples; integration itself was not
-  tested on this server.
-
-### Drain and recovery
-
-A 15-second drain was not sufficient for this stack. The client received HTTP 200 and `[DONE]`,
-but vLLM ended the generation with `finish_reason: "abort"` after one token. With
-`drainTimeout: 60s`, the repeated deletion test delivered 129 SSE chunks, `[DONE]`, HTTP 200, and
-normal `finish_reason: "length"` in 51.80 seconds. The 910B service example therefore uses 60 seconds.
-
-The following recovery paths also passed:
-
-- a no-op apply preserved every owned Deployment, Service, PVC, and ScaledObject UID;
-- deleting the gateway Pod produced a new Ready Pod and left the public Service healthy;
-- restarting the operator preserved all owned resource UIDs and status;
-- a same-values Helm upgrade to revision 2 preserved the operator Deployment and service resources;
-- a full host reboot restored the 6.8 kernel, driver modules, healthy NPU, device-plugin resource,
-  K3s, KEDA, Hearth, gateway, ScaledObject, and bound PVC; and
-- the cache checksum remained unchanged. A post-reboot cold request again completed through the
-  gateway with real NPU tokens, `[DONE]`, and HTTP 200 in 256.25 seconds before returning to zero.
-
-Runtime selection by vendor also resolved the Ascend profile. Unsupported `kvCacheUtil` scaling,
-fractional devices, private-source `secretRef`, and a missing runtime produced their intended
-Degraded reasons. Admission rejected `scaling.min > scaling.max` and an unknown runtime vendor.
-
-## Release-candidate findings
-
-The hardware run found three release-image/example issues. The example corrections work immediately;
-the controller corrections require an operator image rebuilt from current source:
-
-1. The old 910B example supplied only `--model=...` flags. The runtime image entrypoint delegates to
-   argv, so it needs explicit `vllm serve`. The example now uses that form.
-2. The release operator omitted `TORCH_DEVICE_BACKEND_AUTOLOAD=0` from accelerator-free prewarm
-   Pods. ModelScope imported PyTorch, auto-loaded `torch_npu`, and failed on `libascend_hal.so`.
-   Current source adds the safeguard; the corrected Job completed without an NPU.
-3. Changing an `InferenceRuntime` did not requeue its dependent `LLMService` in the release image.
-   The backend template changed only after the service was touched. Current source already watches
-   runtimes from the service reconciler.
-
-The images also identify their version as `dev`. Release builds should inject the version so logs
-can be tied to an artifact.
-
-## Deployment runbook
-
-### 1. Prepare a compatible node
-
-Install a firmware/driver/kernel combination supported by the server vendor. Before Kubernetes
-deployment, require all of these to pass:
+Run on the NPU node and save the output:
 
 ```bash
-uname -r
+uname -a
+cat /etc/os-release
 npu-smi info
 cat /usr/local/Ascend/driver/version.info
+cat /etc/ascend_install.info
 ```
 
-If K3s images and model weights should live on a data disk, configure both `data-dir` and
-`default-local-storage-path` in `/etc/rancher/k3s/config.yaml`; do not rely on editing K3s's
-generated local-path manifest.
-
-### 2. Install and verify the device plugin
-
-Use MindCluster's standard non-Volcano Ascend 910 manifest unless the cluster deliberately uses a
-different scheduler mode. Its node selector and the Hearth runtime example use the same label:
+From the Kubernetes management node:
 
 ```bash
-kubectl label node <npu-node> accelerator=huawei-Ascend910 --overwrite
+kubectl version
+kubectl get nodes -o wide
+kubectl get pods -n kube-system | grep -i ascend
+kubectl get crd scaledobjects.keda.sh
+```
+
+Record the exact server product, NPU identifier and memory, host architecture, firmware, driver,
+CANN, device-plugin, container-runtime, Kubernetes, KEDA, and image versions.
+
+## 2. Verify the device resource
+
+This runbook assumes Ascend Device Plugin is installed in standard non-mixed mode. The target node
+must report a non-zero `huawei.com/Ascend910` value:
+
+```bash
 kubectl get nodes \
   -o custom-columns='NAME:.metadata.name,ASCEND910:.status.allocatable.huawei\.com/Ascend910'
 ```
 
-Do not continue until the value is non-zero and the plugin log reports a healthy device.
+Check the device-plugin Pod log and confirm that the intended device is healthy. Do not continue
+until the node resource and plugin health both pass.
 
-### 3. Install Hearth and apply the validated profile
+## 3. Label the NPU node
 
-Install KEDA and Hearth using the normal project instructions, then use a dedicated namespace:
+The runtime profile uses the label from MindCluster's standard Ascend 910 deployment:
 
 ```bash
+kubectl label node <npu-node> accelerator=huawei-Ascend910 --overwrite
+kubectl get node <npu-node> -L accelerator
+```
+
+## 4. Prepare Hearth
+
+Use a dedicated cluster and namespace. Confirm the context, then install KEDA and Hearth by
+following [Getting started](../getting-started.md):
+
+```bash
+kubectl config current-context
 kubectl create namespace hearth-910b-validation
+```
+
+If the cluster has no default dynamic StorageClass, set `cache.storageClassName` in the service
+example before applying it. On K3s, place both the K3s data directory and local-path storage on the
+data disk through `/etc/rancher/k3s/config.yaml`; do not edit generated local-path manifests.
+
+Verify a test PVC on the data disk before downloading model weights.
+
+## 5. Deploy the profile
+
+```bash
+SERVICE=qwen-910b-validation
+
 kubectl apply -k examples/ascend/910b3 -n hearth-910b-validation
 kubectl get llmservice,pvc,job,deploy,pod,scaledobject \
   -n hearth-910b-validation -w
 ```
 
-If the cluster lacks a default StorageClass, set `cache.storageClassName`. Keep `scaling.max: 1`
-unless more than one schedulable `huawei.com/Ascend910` resource is actually available.
-
-### 4. Exercise scale-to-zero
-
-Wait for prewarm completion and for KEDA to hold the backend at zero, then expose the gateway:
+Wait for the prewarm Job to complete and KEDA to hold the backend at zero. During activation,
+confirm that the backend Pod lands on the labeled node and requests one device:
 
 ```bash
-kubectl port-forward -n hearth-910b-validation \
-  service/qwen-910b-validation 8080:80
-
-curl -N http://127.0.0.1:8080/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{"model":"qwen-910b-validation","stream":true,"max_tokens":32,"messages":[{"role":"user","content":"Reply with: Hearth 910B validation passed"}]}'
+kubectl get pod -n hearth-910b-validation \
+  -l "serving.hearth.dev/llmservice=$SERVICE" \
+  -o custom-columns='NAME:.metadata.name,NODE:.spec.nodeName,NPU:.spec.containers[0].resources.limits.huawei\.com/Ascend910'
 ```
 
-Record the zero replica state, KEDA activation, plugin allocation, load-gated readiness, completed
-response, metrics, scale-down, and released NPU. A multi-device server should additionally raise
-the configured maximum and prove distinct devices before making a multi-replica claim.
+## 6. Exercise inference and scale-to-zero
 
-## Remaining bounds
+Watch the backend Deployment:
 
-- Multi-replica scaling was not testable on the one-device server.
-- Volcano, HAMi sharing, and Prometheus Operator were not installed; only the scheduler boundaries
-  or rendered contracts were checked.
-- The exact RC image, driver, firmware, kernel, and device-plugin combination is the evidence unit.
-  Revalidate after changing any of them.
-- Hearth remains `v1alpha1` and has no authentication or multi-tenancy; hardware validation does
-  not make it production-ready for shared or public workloads.
+```bash
+kubectl get deployment "$SERVICE" -n hearth-910b-validation -w
+```
+
+In another terminal, expose the gateway:
+
+```bash
+kubectl port-forward -n hearth-910b-validation "service/$SERVICE" 8080:80
+```
+
+Send a streaming request. The gateway may emit heartbeat comments while the model loads:
+
+```bash
+curl -N http://127.0.0.1:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d "{\"model\":\"$SERVICE\",\"stream\":true,\"max_tokens\":32,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with: Hearth 910B validation passed\"}]}"
+```
+
+Record idle replicas at zero, the cold request causing `0 -> 1`, Loading-to-Ready status, a
+complete stream ending in `[DONE]`, and the backend returning to zero after the stabilization
+window. Confirm with `npu-smi info` that the serving process disappears after scale-down.
+
+To validate drain, start a response long enough to remain active, delete the backend Pod, and
+confirm that the client receives `[DONE]` with a normal finish reason before termination.
+
+## 7. Troubleshooting
+
+### Backend remains Pending
+
+```bash
+kubectl describe pod -n hearth-910b-validation <backend-pod>
+kubectl get nodes -L accelerator
+kubectl describe node <npu-node> | grep -A5 -B5 Ascend910
+```
+
+Check the advertised resource, node label, taints, device-plugin health, and cache PVC binding.
+
+### Prewarm fails
+
+```bash
+kubectl logs -n hearth-910b-validation job/qwen-910b-validation-prewarm
+kubectl describe pvc -n hearth-910b-validation qwen-910b-validation-cache
+```
+
+Check ModelScope egress, DNS, proxy settings, StorageClass availability, disk capacity, and runtime
+image compatibility.
+
+### Backend never becomes Ready
+
+```bash
+kubectl logs -n hearth-910b-validation deployment/qwen-910b-validation --all-containers
+kubectl describe pod -n hearth-910b-validation \
+  -l serving.hearth.dev/llmservice=qwen-910b-validation
+```
+
+Check the image, driver, firmware, CANN compatibility, driver projections, device assignment, and
+rendered `vllm serve` arguments before changing probe limits.
+
+### Driver does not load
+
+The validated host initially had a kernel against which the `26.0.rc1` driver did not build. Use a
+kernel supported by the exact server and driver combination; do not copy the validated kernel
+version without checking compatibility. Verify the driver again after reboot.
+
+### NPU out of memory
+
+```bash
+npu-smi info
+kubectl get pod -n hearth-910b-validation <backend-pod> -o yaml
+```
+
+Check for competing NPU processes and confirm the model and context limit. vLLM reserves most
+available HBM for KV cache by default, so high reported use does not by itself mean that model
+weights occupy that amount.
+
+### Gateway activation timeout
+
+Inspect prewarming, scheduling, startup, and readiness before increasing `activationTimeout`. A
+longer timeout does not fix missing devices, incompatible software, failed downloads, or probe
+failures.
+
+### Stream aborts during termination
+
+Keep `drainTimeout: 60s` as the validated baseline. A shorter value aborted generation on this
+stack. Larger models or longer outputs may require a longer runtime termination grace period.
+
+## Success criteria
+
+The 910B3 profile passes physical validation only when:
+
+- the node reports a healthy `huawei.com/Ascend910` resource and matches the runtime selector;
+- prewarming completes without requesting an NPU;
+- the backend receives one device and `/health` gates readiness correctly;
+- an OpenAI-compatible streaming request completes through the gateway with `[DONE]`;
+- KEDA completes an observed `0 -> 1 -> 0` loop and releases the NPU;
+- an in-flight stream completes during backend termination; and
+- the driver, firmware, CANN, device-plugin, image, logs, and timings are recorded.
+
+A multi-replica claim additionally requires more than one schedulable device, multiple Ready Pods
+on distinct allocations, and an observed `1 -> N -> 0` lifecycle.

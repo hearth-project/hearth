@@ -39,13 +39,14 @@ API group `serving.hearth.dev/v1alpha1`.
 - **Gateway** (`internal/gateway`) — the data plane: an OpenAI-compatible reverse proxy in front of
   each `LLMService`. It buffers requests during cold start, applies bounded-queue backpressure,
   emits SSE keepalive heartbeats (or fast-rejects), drains in-flight streams on scale-down, and
-  exposes its pending-request count as the demand signal.
+  exposes its pending-request count over HTTP and, when enabled, KEDA's ExternalScaler gRPC API.
 
 ## Reconcile output
 
 For one `LLMService`, the operator renders: a vLLM **Deployment** (it does *not* set `replicas` —
 KEDA owns `0..N`), a backend **Service**, a **gateway** Deployment + Service, a model **cache**
-(PVC/HostPath) + optional **prewarm Job**, and a KEDA **ScaledObject**.
+(PVC/HostPath) + optional **prewarm Job**, and a KEDA **ScaledObject**. External-push mode also
+creates a cluster-internal scaler Service for the gateway's gRPC port.
 
 ```mermaid
 flowchart TD
@@ -53,6 +54,7 @@ flowchart TD
   op --> dep["vLLM Deployment<br/>(replicas owned by KEDA)"]
   op --> bsvc["Backend Service"]
   op --> gwd["Gateway Deployment + Service"]
+  op -.-> scaler["Internal scaler Service<br/>(external-push only)"]
   op --> cache["Model cache (PVC/HostPath)<br/>+ optional prewarm Job"]
   op --> so["KEDA ScaledObject"]
 ```
@@ -77,7 +79,7 @@ flowchart LR
   client -->|"OpenAI API"| gw
   gw -->|"forward when Ready"| svc --> pods
   pods -.->|"load weights"| cache
-  keda -->|"poll /hearth/queue (pending)"| gw
+  keda -->|"poll /hearth/queue (default)<br/>or StreamIsActive + GetMetrics"| gw
   keda --> so
   so -->|"scale 0..N"| pods
 
@@ -93,14 +95,33 @@ flowchart LR
 2. **Cold request** — the gateway admits the request (bounded queue → `429` if full), raises its
    `pending` count, and holds the connection. In `keepalive` mode it streams SSE heartbeats so the
    client/ingress don't time out; in `reject` mode it returns `503 + Retry-After` and the client retries.
-3. **Activation** — KEDA's `metrics-api` trigger polls the gateway's `/hearth/queue`; `pending > 0`
-   drives the Deployment **0 → 1**. The pod loads weights from the local cache when prewarming has
-   completed and only becomes **Ready** once the model is loaded (load-gated readiness probes).
+3. **Activation** — in the default `metrics-api` mode, KEDA polls `/hearth/queue`. In opt-in
+   `external-push` mode, the co-located ExternalScaler sends an active event immediately and KEDA
+   continues to call `GetMetrics` for the queue value. Either path drives the Deployment **0 → 1**.
+   The pod loads weights from cache and becomes **Ready** only after the model is loaded.
 4. **Serve** — the gateway forwards the buffered request and streams tokens back.
 5. **Scale up** — sustained queue depth above the per-replica target scales **1 → N** (one whole
    device per replica).
 6. **Scale down** — when demand drops, KEDA scales back toward **0**; a `preStop` drain lets
    in-flight streams finish before the pod is terminated.
+
+### Scaler transport
+
+`metrics-api` remains the compatibility default. Set the operator's
+`--scaler-mode=external-push` flag, or Helm value `gateway.scalerMode=external-push`, to remove the
+poll interval from cold activation. External-push requires exactly one gateway replica: a KEDA
+stream connects to one Pod and Hearth does not yet aggregate demand across gateway replicas. The
+operator refuses that mode when `gateway.replicas` is not `1`.
+
+Cold admission starts an activation lease that is independent of the client connection. The lease
+keeps demand active until the backend becomes ready (plus a short retry grace) or
+`activationTimeout` expires. This lets `reject` mode return `503 + Retry-After` without losing the
+activation signal. Every new gRPC stream receives the current state immediately, including when
+KEDA reconnects the stream. `/hearth/queue` remains available for observability and rollback.
+
+The scaler Service is ClusterIP-only and uses plaintext gRPC on port `9090`; it is not exposed by
+the public gateway Service. Restrict access with cluster NetworkPolicy where tenant isolation is
+required.
 
 ## Observability
 

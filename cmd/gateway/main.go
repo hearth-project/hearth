@@ -21,8 +21,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/hearth-project/hearth/internal/gateway"
 )
@@ -46,14 +50,49 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to build gateway: %v", err)
 	}
+	defer gw.Close()
 
 	addr := os.Getenv(gateway.EnvListenAddr)
 	if addr == "" {
 		addr = gateway.DefaultListenAddr
 	}
 
+	scalerAddr := os.Getenv(gateway.EnvScalerListenAddr)
 	log.Printf("Hearth gateway version %s listening on %s, backend %s", version, addr, cfg.BackendURL)
-	if err := http.ListenAndServe(addr, gw.Handler()); err != nil { //nolint:gosec // G114: timeouts handled per-request
+	if scalerAddr != "" {
+		log.Printf("Hearth external scaler listening on %s", scalerAddr)
+	}
+	if err := serve(gw, addr, scalerAddr); err != nil {
 		log.Fatalf("Gateway server failed: %v", err)
 	}
+}
+
+func serve(gw *gateway.Gateway, addr, scalerAddr string) error {
+	httpListener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen for HTTP: %w", err)
+	}
+	httpServer := &http.Server{
+		Handler:           gw.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	if scalerAddr == "" {
+		return httpServer.Serve(httpListener)
+	}
+
+	scalerListener, err := net.Listen("tcp", scalerAddr)
+	if err != nil {
+		_ = httpListener.Close()
+		return fmt.Errorf("listen for external scaler gRPC: %w", err)
+	}
+	grpcServer := grpc.NewServer()
+	gateway.RegisterExternalScalerServer(grpcServer, gw)
+
+	errors := make(chan error, 2)
+	go func() { errors <- httpServer.Serve(httpListener) }()
+	go func() { errors <- grpcServer.Serve(scalerListener) }()
+	err = <-errors
+	grpcServer.Stop()
+	_ = httpServer.Close()
+	return err
 }

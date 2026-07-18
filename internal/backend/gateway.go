@@ -29,14 +29,17 @@ import (
 )
 
 const (
-	gatewayPort = 8080
-	// defaultGatewayReplicas is 1 for crisp scale-from-zero: KEDA's metrics-api polls a
-	// single gateway replica's pending count, so >1 replica (each counting its own
-	// pending) softens activation until an aggregating scaler lands. Accepts SPOF for v0.
+	gatewayPort       = 8080
+	gatewayScalerPort = 9090
+	// One replica gives either scaler transport a complete demand view. External-push
+	// enforces it; metrics-api keeps the legacy override for compatibility.
 	defaultGatewayReplicas = 1
 	gatewayLabel           = "serving.hearth.dev/gateway"
 	backendSvcSuffix       = "-backend"
+	gatewayScalerSvcSuffix = "-scaler"
 	portNameHTTP           = "http"
+	portNameGRPC           = "grpc"
+	serviceKind            = "Service"
 )
 
 func BackendServiceName(svc *servingv1alpha1.LLMService) string {
@@ -44,6 +47,14 @@ func BackendServiceName(svc *servingv1alpha1.LLMService) string {
 }
 
 func GatewayServiceName(svc *servingv1alpha1.LLMService) string { return svc.Name }
+
+func GatewayScalerServiceName(svc *servingv1alpha1.LLMService) string {
+	return svc.Name + gatewayScalerSvcSuffix
+}
+
+func GatewayScalerAddress(svc *servingv1alpha1.LLMService) string {
+	return fmt.Sprintf("%s.%s.svc:%d", GatewayScalerServiceName(svc), svc.Namespace, gatewayScalerPort)
+}
 
 func gatewaySelectorLabels(svc *servingv1alpha1.LLMService) map[string]string {
 	return map[string]string{
@@ -63,7 +74,7 @@ func gatewayServiceLabels(svc *servingv1alpha1.LLMService) map[string]string {
 
 func BuildBackendService(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.InferenceRuntime) *corev1.Service {
 	return &corev1.Service{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: serviceKind},
 		ObjectMeta: metav1.ObjectMeta{Name: BackendServiceName(svc), Namespace: svc.Namespace, Labels: SelectorLabels(svc)},
 		Spec: corev1.ServiceSpec{
 			Selector: SelectorLabels(svc),
@@ -79,7 +90,7 @@ func BuildBackendService(svc *servingv1alpha1.LLMService, rt *servingv1alpha1.In
 
 func BuildGatewayService(svc *servingv1alpha1.LLMService) *corev1.Service {
 	return &corev1.Service{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Service"},
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: serviceKind},
 		ObjectMeta: metav1.ObjectMeta{Name: GatewayServiceName(svc), Namespace: svc.Namespace, Labels: gatewayServiceLabels(svc)},
 		Spec: corev1.ServiceSpec{
 			Selector: gatewaySelectorLabels(svc),
@@ -93,7 +104,24 @@ func BuildGatewayService(svc *servingv1alpha1.LLMService) *corev1.Service {
 	}
 }
 
-func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, replicas int32) *appsv1.Deployment {
+func BuildGatewayScalerService(svc *servingv1alpha1.LLMService) *corev1.Service {
+	return &corev1.Service{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: serviceKind},
+		ObjectMeta: metav1.ObjectMeta{Name: GatewayScalerServiceName(svc), Namespace: svc.Namespace, Labels: gatewayServiceLabels(svc)},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeClusterIP,
+			Selector: gatewaySelectorLabels(svc),
+			Ports: []corev1.ServicePort{{
+				Name:       portNameGRPC,
+				Port:       gatewayScalerPort,
+				TargetPort: intstr.FromInt(gatewayScalerPort),
+				Protocol:   corev1.ProtocolTCP,
+			}},
+		},
+	}
+}
+
+func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, replicas int32, scalerMode ScalerMode) *appsv1.Deployment {
 	if replicas <= 0 {
 		replicas = defaultGatewayReplicas
 	}
@@ -103,6 +131,11 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 	env := []corev1.EnvVar{
 		{Name: gateway.EnvBackendURL, Value: backendURL},
 		{Name: gateway.EnvListenAddr, Value: fmt.Sprintf(":%d", gatewayPort)},
+	}
+	ports := []corev1.ContainerPort{{Name: portNameHTTP, ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}}
+	if scalerMode == ScalerModeExternalPush {
+		env = append(env, corev1.EnvVar{Name: gateway.EnvScalerListenAddr, Value: fmt.Sprintf(":%d", gatewayScalerPort)})
+		ports = append(ports, corev1.ContainerPort{Name: portNameGRPC, ContainerPort: gatewayScalerPort, Protocol: corev1.ProtocolTCP})
 	}
 	if at := svc.Spec.Scaling.ActivationTimeout.Duration; at > 0 {
 		env = append(env, corev1.EnvVar{Name: gateway.EnvActivationTimeout, Value: at.String()})
@@ -123,7 +156,7 @@ func BuildGatewayDeployment(svc *servingv1alpha1.LLMService, image string, repli
 			Name:           "gateway",
 			Image:          image,
 			Env:            env,
-			Ports:          []corev1.ContainerPort{{Name: portNameHTTP, ContainerPort: gatewayPort, Protocol: corev1.ProtocolTCP}},
+			Ports:          ports,
 			ReadinessProbe: probe,
 			LivenessProbe:  probe.DeepCopy(),
 		}},

@@ -66,6 +66,36 @@ var _ = Describe("scale-to-zero loop", Ordered, func() {
 			Should(Equal(0), "KEDA should hold the backend at 0 replicas while idle")
 	})
 
+	It("renders the selected KEDA scaler transport", func() {
+		Eventually(func() string {
+			out, _ := kubectl("get", "scaledobject", "stub-svc", "-n", ns,
+				"-o", "jsonpath={.spec.triggers[0].type}")
+			return out
+		}, time.Minute, 2*time.Second).Should(Equal(scalerMode))
+		if scalerMode != "external-push" {
+			_, err := kubectl("get", "service", "stub-svc-scaler", "-n", ns)
+			Expect(err).To(HaveOccurred(), "metrics-api mode must not leave an internal scaler Service")
+			return
+		}
+
+		address := mustKubectl("get", "scaledobject", "stub-svc", "-n", ns,
+			"-o", "jsonpath={.spec.triggers[0].metadata.scalerAddress}")
+		Expect(address).To(Equal("stub-svc-scaler.hearth-e2e.svc:9090"))
+		mustKubectl("get", "service", "stub-svc-scaler", "-n", ns)
+
+		cancel := portForward("stub-svc", 18084)
+		defer cancel()
+		Eventually(func() string {
+			resp, err := httpClient.Get("http://127.0.0.1:18084/metrics")
+			if err != nil {
+				return ""
+			}
+			defer func() { _ = resp.Body.Close() }()
+			body, _ := io.ReadAll(resp.Body)
+			return string(body)
+		}, time.Minute, 2*time.Second).Should(ContainSubstring("hearth_gateway_scaler_streams 1"))
+	})
+
 	It("wakes on a cold request and streams a real response (0→1)", func() {
 		cancel := portForward("stub-svc", 18080)
 		defer cancel()

@@ -66,6 +66,7 @@ func newGateway(t *testing.T, backendURL string, maxQueue int, timeout time.Dura
 		RetryInterval:     5 * time.Millisecond,
 	})
 	g.Expect(err).NotTo(HaveOccurred())
+	t.Cleanup(gw.Close)
 	return gw
 }
 
@@ -170,6 +171,7 @@ func TestExposesPrometheusMetrics(t *testing.T) {
 	body, _ := io.ReadAll(m.Body)
 	g.Expect(string(body)).To(ContainSubstring("hearth_gateway_requests_total"))
 	g.Expect(string(body)).To(ContainSubstring("hearth_gateway_activation_wait_seconds"))
+	g.Expect(string(body)).To(ContainSubstring("hearth_gateway_demand"))
 }
 
 func TestKeepaliveStreamsHeartbeatsThenResponse(t *testing.T) {
@@ -275,6 +277,7 @@ func TestRejectModeReturns503AndKeepsDemand(t *testing.T) {
 		ColdStartMode:     gateway.ColdStartReject,
 	})
 	g.Expect(err).NotTo(HaveOccurred())
+	t.Cleanup(gw.Close)
 	fe := httptest.NewServer(gw.Handler())
 	defer fe.Close()
 
@@ -285,6 +288,32 @@ func TestRejectModeReturns503AndKeepsDemand(t *testing.T) {
 	g.Expect(resp.Header.Get("Retry-After")).NotTo(BeEmpty())
 
 	g.Expect(queuePending(fe.URL)).To(Equal(int64(1)))
+}
+
+func TestActivationLeaseEndsAfterBackendReadyGrace(t *testing.T) {
+	g := NewWithT(t)
+	be := &stubBackend{}
+	srv := httptest.NewServer(be.handler())
+	defer srv.Close()
+
+	gw, err := gateway.New(gateway.Config{
+		BackendURL:            srv.URL,
+		ColdStartMode:         gateway.ColdStartReject,
+		ActivationTimeout:     time.Second,
+		ActivationGracePeriod: 80 * time.Millisecond,
+		RetryInterval:         5 * time.Millisecond,
+	})
+	g.Expect(err).NotTo(HaveOccurred())
+	t.Cleanup(gw.Close)
+
+	response := httptest.NewRecorder()
+	gw.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/v1/x", nil))
+	g.Expect(response.Code).To(Equal(http.StatusServiceUnavailable))
+	g.Expect(gw.Demand()).To(Equal(int64(1)))
+
+	be.ready.Store(true)
+	g.Consistently(gw.Demand, 40*time.Millisecond, 5*time.Millisecond).Should(Equal(int64(1)))
+	g.Eventually(gw.Demand, time.Second, 5*time.Millisecond).Should(Equal(int64(0)))
 }
 
 func queuePending(base string) int64 {

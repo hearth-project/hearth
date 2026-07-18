@@ -40,7 +40,7 @@ func TestScaledObjectMetricsAPITrigger(t *testing.T) {
 	g := NewWithT(t)
 	svc := scalingService()
 	svc.Spec.Scaling.ScaleDownStabilization = metav1.Duration{Duration: 5 * time.Minute}
-	so, err := backend.BuildScaledObject(svc)
+	so, err := backend.BuildScaledObject(svc, backend.ScalerModeMetricsAPI)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	g.Expect(so.GetAPIVersion()).To(Equal("keda.sh/v1alpha1"))
@@ -73,11 +73,11 @@ func TestScaledObjectRejectsUnimplementedMetric(t *testing.T) {
 	g := NewWithT(t)
 	svc := scalingService()
 	svc.Spec.Scaling.Metric = "kvCacheUtil"
-	_, err := backend.BuildScaledObject(svc)
+	_, err := backend.BuildScaledObject(svc, backend.ScalerModeMetricsAPI)
 	g.Expect(err).To(MatchError(ContainSubstring("kvCacheUtil")))
 
 	svc.Spec.Scaling.Metric = "queueDepth"
-	_, err = backend.BuildScaledObject(svc)
+	_, err = backend.BuildScaledObject(svc, backend.ScalerModeMetricsAPI)
 	g.Expect(err).NotTo(HaveOccurred())
 }
 
@@ -87,7 +87,7 @@ func TestScaledObjectRejectsInvalidScaleDownStabilization(t *testing.T) {
 			g := NewWithT(t)
 			svc := scalingService()
 			svc.Spec.Scaling.ScaleDownStabilization = metav1.Duration{Duration: window}
-			_, err := backend.BuildScaledObject(svc)
+			_, err := backend.BuildScaledObject(svc, backend.ScalerModeMetricsAPI)
 			g.Expect(err).To(MatchError(ContainSubstring("from 0s to 1h")))
 		})
 	}
@@ -95,7 +95,7 @@ func TestScaledObjectRejectsInvalidScaleDownStabilization(t *testing.T) {
 
 func TestScaledObjectPreservesZeroScaleDownStabilization(t *testing.T) {
 	g := NewWithT(t)
-	so, err := backend.BuildScaledObject(scalingService())
+	so, err := backend.BuildScaledObject(scalingService(), backend.ScalerModeMetricsAPI)
 	g.Expect(err).NotTo(HaveOccurred())
 	spec := so.Object["spec"].(map[string]any)
 	g.Expect(spec["cooldownPeriod"]).To(Equal(int64(0)))
@@ -104,4 +104,32 @@ func TestScaledObjectPreservesZeroScaleDownStabilization(t *testing.T) {
 	behavior := hpa["behavior"].(map[string]any)
 	scaleDown := behavior["scaleDown"].(map[string]any)
 	g.Expect(scaleDown["stabilizationWindowSeconds"]).To(Equal(int64(0)))
+}
+
+func TestScaledObjectExternalPushTrigger(t *testing.T) {
+	g := NewWithT(t)
+	so, err := backend.BuildScaledObject(scalingService(), backend.ScalerModeExternalPush)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	spec := so.Object["spec"].(map[string]any)
+	triggers := spec["triggers"].([]any)
+	g.Expect(triggers).To(HaveLen(1))
+	trigger := triggers[0].(map[string]any)
+	g.Expect(trigger["type"]).To(Equal("external-push"))
+	metadata := trigger["metadata"].(map[string]any)
+	g.Expect(metadata).To(Equal(map[string]any{
+		"scalerAddress": "qwen3-8b-scaler.ai.svc:9090",
+		"metricName":    "pending",
+		"targetValue":   "10",
+	}))
+}
+
+func TestParseScalerMode(t *testing.T) {
+	g := NewWithT(t)
+	for _, value := range []string{"", "metrics-api", "external-push"} {
+		_, err := backend.ParseScalerMode(value)
+		g.Expect(err).NotTo(HaveOccurred())
+	}
+	_, err := backend.ParseScalerMode("unknown")
+	g.Expect(err).To(MatchError(ContainSubstring("unsupported scaler mode")))
 }

@@ -26,8 +26,7 @@ side of that line.
 - **Validate on real hardware** — especially the complete Ascend device-plugin and scale-to-zero
   path. Start with the [Ascend validation guide](docs/ascend/ascend-validation.md).
 - **Pick up a roadmap item** — see [`ROADMAP.md`](ROADMAP.md). The **P1/P2** items
-  (`oci://` model sources, `SharedPVC`, gateway auth, HA hardening)
-  and the **community track** (the KEDA external push scaler, #42) are great entry points.
+  (`oci://` model sources, `SharedPVC`, gateway auth, HA hardening) are great entry points.
 - **Docs, examples, bug reports, repros** — all welcome, no change too small.
 
 Look for issues labeled **`good first issue`** / **`help wanted`**, or open one to discuss before a

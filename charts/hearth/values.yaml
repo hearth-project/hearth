@@ -17,9 +17,10 @@ operator:
       memory: 128Mi
 
 gateway:
-  # Replicas for each LLMService's data-plane gateway. 1 gives crisp scale-from-zero;
-  # >1 adds HA but softens activation until an aggregating scaler lands.
+  # external-push requires exactly one gateway replica. metrics-api remains the
+  # compatibility default and permits more replicas with less precise activation.
   replicas: 1
+  scalerMode: metrics-api
 
 serviceAccount:
   create: true

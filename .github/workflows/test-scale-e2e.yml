@@ -14,8 +14,12 @@ jobs:
   test-scale-e2e:
     permissions:
       contents: read
-    name: No-GPU scale-to-zero loop
+    name: No-GPU scale-to-zero loop (${{ matrix.scaler-mode }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scaler-mode: [metrics-api, external-push]
     steps:
       - name: Clone the code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -50,4 +54,4 @@ jobs:
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum
-          make test-scale-e2e
+          make test-scale-e2e SCALE_SCALER_MODE=${{ matrix.scaler-mode }}

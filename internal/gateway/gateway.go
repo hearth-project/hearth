@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,6 +44,7 @@ const (
 	EnvMaxQueue          = "HEARTH_MAX_QUEUE"
 	EnvActivationTimeout = "HEARTH_ACTIVATION_TIMEOUT"
 	EnvListenAddr        = "HEARTH_LISTEN_ADDR"
+	EnvScalerListenAddr  = "HEARTH_SCALER_LISTEN_ADDR"
 	EnvColdStartMode     = "HEARTH_COLDSTART_MODE"
 	EnvHeartbeatInterval = "HEARTH_HEARTBEAT_INTERVAL"
 
@@ -67,9 +69,9 @@ type Config struct {
 	RetryInterval     time.Duration
 	ColdStartMode     string
 	HeartbeatInterval time.Duration
-	// DemandLinger keeps the pending signal raised briefly after a cold request returns,
-	// so the scaler still sees demand across its poll interval even in reject mode.
-	DemandLinger time.Duration
+	// ActivationGracePeriod keeps demand raised after the backend first becomes ready,
+	// giving reject-mode clients time to retry without an immediate scale-down.
+	ActivationGracePeriod time.Duration
 }
 
 func ConfigFromEnv() Config {
@@ -90,18 +92,23 @@ func ConfigFromEnv() Config {
 }
 
 type metrics struct {
-	registry   *prometheus.Registry
-	pending    prometheus.Gauge
-	requests   *prometheus.CounterVec
-	rejections *prometheus.CounterVec
-	coldStart  prometheus.Histogram
+	registry         *prometheus.Registry
+	pending          prometheus.Gauge
+	demand           prometheus.Gauge
+	requests         *prometheus.CounterVec
+	rejections       *prometheus.CounterVec
+	coldStart        prometheus.Histogram
+	scalerStreams    prometheus.Gauge
+	activationEvents prometheus.Counter
 }
 
 func newMetrics() *metrics {
 	m := &metrics{
 		registry: prometheus.NewRegistry(),
 		pending: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "hearth_gateway_pending", Help: "Requests admitted and waiting or in flight (the scaler's demand signal)."}),
+			Name: "hearth_gateway_pending", Help: "Requests admitted and waiting or in flight."}),
+		demand: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "hearth_gateway_demand", Help: "Effective queue demand reported to KEDA, including an activation lease floor."}),
 		requests: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "hearth_gateway_requests_total", Help: "Responses by HTTP status code."}, []string{"code"}),
 		rejections: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -109,21 +116,37 @@ func newMetrics() *metrics {
 		coldStart: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name: "hearth_gateway_activation_wait_seconds", Help: "Time spent holding a request until the backend was ready.",
 			Buckets: []float64{0.01, 0.1, 1, 5, 15, 30, 60, 120, 300}}),
+		scalerStreams: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "hearth_gateway_scaler_streams", Help: "Connected KEDA external-push activation streams."}),
+		activationEvents: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "hearth_gateway_activation_events_total", Help: "Inactive-to-active effective demand transitions."}),
 	}
-	m.registry.MustRegister(m.pending, m.requests, m.rejections, m.coldStart)
+	m.registry.MustRegister(m.pending, m.demand, m.requests, m.rejections, m.coldStart, m.scalerStreams, m.activationEvents)
 	return m
 }
 
 type Gateway struct {
-	cfg         Config
-	backend     *url.URL
-	proxy       *httputil.ReverseProxy
-	sem         chan struct{}
-	pending     atomic.Int64
-	demandUntil atomic.Int64
-	m           *metrics
-	probe       *http.Client
-	now         func() time.Time
+	cfg     Config
+	backend *url.URL
+	proxy   *httputil.ReverseProxy
+	sem     chan struct{}
+	pending atomic.Int64
+	m       *metrics
+	probe   *http.Client
+	now     func() time.Time
+	ctx     context.Context
+	cancel  context.CancelFunc
+
+	leaseMu         sync.Mutex
+	leaseActive     bool
+	leaseDeadline   time.Time
+	readyGraceUntil time.Time
+	leaseWatcher    bool
+
+	subMu          sync.Mutex
+	subscribers    map[uint64]chan bool
+	nextSubscriber uint64
+	lastActive     bool
 }
 
 type activationWaitResult int
@@ -154,29 +177,50 @@ func New(cfg Config) (*Gateway, error) {
 	if cfg.HeartbeatInterval <= 0 {
 		cfg.HeartbeatInterval = 10 * time.Second
 	}
-	if cfg.DemandLinger <= 0 {
-		cfg.DemandLinger = 15 * time.Second
+	if cfg.ActivationGracePeriod <= 0 {
+		cfg.ActivationGracePeriod = 15 * time.Second
 	}
 	proxy := httputil.NewSingleHostReverseProxy(u)
 	proxy.FlushInterval = -1 // flush every write so tokens stream as they arrive
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Gateway{
-		cfg:     cfg,
-		backend: u,
-		proxy:   proxy,
-		sem:     make(chan struct{}, cfg.MaxQueue),
-		m:       newMetrics(),
-		probe:   &http.Client{Timeout: 2 * time.Second},
-		now:     time.Now,
+		cfg:         cfg,
+		backend:     u,
+		proxy:       proxy,
+		sem:         make(chan struct{}, cfg.MaxQueue),
+		m:           newMetrics(),
+		probe:       &http.Client{Timeout: 2 * time.Second},
+		now:         time.Now,
+		ctx:         ctx,
+		cancel:      cancel,
+		subscribers: make(map[uint64]chan bool),
 	}, nil
 }
 
 func (g *Gateway) Pending() int64 { return g.pending.Load() }
 
+func (g *Gateway) Demand() int64 {
+	pending := g.pending.Load()
+	if pending > 0 {
+		return pending
+	}
+	now := g.now()
+	g.leaseMu.Lock()
+	active := (g.leaseActive && now.Before(g.leaseDeadline)) || now.Before(g.readyGraceUntil)
+	g.leaseMu.Unlock()
+	if active {
+		return 1
+	}
+	return 0
+}
+
+func (g *Gateway) Close() { g.cancel() }
+
 func (g *Gateway) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc(QueuePath, func(w http.ResponseWriter, _ *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]int64{"pending": g.demand()})
+		_ = json.NewEncoder(w).Encode(map[string]int64{"pending": g.Demand()})
 	})
 	mux.Handle(MetricsPath, promhttp.HandlerFor(g.m.registry, promhttp.HandlerOpts{}))
 	mux.HandleFunc("/", g.serve)
@@ -197,14 +241,14 @@ func (g *Gateway) serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Demand signal for the scaler, raised for the whole hold-and-serve window.
-	g.m.pending.Set(float64(g.pending.Add(1)))
-	defer func() { g.m.pending.Set(float64(g.pending.Add(-1))) }()
+	g.changePending(1)
+	defer g.changePending(-1)
 
 	waitStart := g.now()
 	committed := false
 	if !g.backendReady(r.Context()) {
 		// Cold start: keep the demand visible to the scaler even if we return fast.
-		g.markDemand()
+		g.beginActivation()
 		switch {
 		case g.cfg.ColdStartMode == ColdStartReject:
 			g.reject(w, "cold_start")
@@ -261,18 +305,134 @@ func (g *Gateway) reject(w http.ResponseWriter, reason string) {
 	http.Error(w, "backend not ready", http.StatusServiceUnavailable)
 }
 
-// demand is the scaler-facing pending count, floored to 1 while a recent cold request
-// lingers so a fast-returning (reject-mode) request still triggers activation.
-func (g *Gateway) demand() int64 {
-	p := g.pending.Load()
-	if p == 0 && g.now().UnixNano() < g.demandUntil.Load() {
-		return 1
-	}
-	return p
+func (g *Gateway) changePending(delta int64) {
+	g.m.pending.Set(float64(g.pending.Add(delta)))
+	g.notifyDemandChange()
 }
 
-func (g *Gateway) markDemand() {
-	g.demandUntil.Store(g.now().Add(g.cfg.DemandLinger).UnixNano())
+// beginActivation holds a demand lease independently of the client connection. This
+// is essential for reject mode: the request can return 503 while KEDA is still
+// starting the backend.
+func (g *Gateway) beginActivation() {
+	now := g.now()
+	g.leaseMu.Lock()
+	g.leaseActive = true
+	g.leaseDeadline = now.Add(g.cfg.ActivationTimeout)
+	startWatcher := !g.leaseWatcher
+	if startWatcher {
+		g.leaseWatcher = true
+	}
+	g.leaseMu.Unlock()
+	g.notifyDemandChange()
+	if startWatcher {
+		go g.watchActivation()
+	}
+}
+
+func (g *Gateway) watchActivation() {
+	for {
+		select {
+		case <-g.ctx.Done():
+			return
+		default:
+		}
+
+		g.leaseMu.Lock()
+		deadline := g.leaseDeadline
+		g.leaseMu.Unlock()
+		if !g.now().Before(deadline) && g.finishActivation(false) {
+			return
+		}
+		probeCtx, cancel := context.WithDeadline(g.ctx, deadline)
+		ready := g.backendReady(probeCtx)
+		cancel()
+		if ready {
+			g.finishActivation(true)
+			return
+		}
+		select {
+		case <-g.ctx.Done():
+			return
+		case <-time.After(g.cfg.RetryInterval):
+		}
+	}
+}
+
+// finishActivation returns false when a newer request renewed a lease that the
+// watcher had considered expired.
+func (g *Gateway) finishActivation(ready bool) bool {
+	now := g.now()
+	g.leaseMu.Lock()
+	if !ready && now.Before(g.leaseDeadline) {
+		g.leaseMu.Unlock()
+		return false
+	}
+	g.leaseActive = false
+	g.leaseWatcher = false
+	if ready {
+		g.readyGraceUntil = now.Add(g.cfg.ActivationGracePeriod)
+	}
+	graceDeadline := g.readyGraceUntil
+	g.leaseMu.Unlock()
+	g.notifyDemandChange()
+	if ready {
+		go g.notifyAfterGrace(graceDeadline)
+	}
+	return true
+}
+
+func (g *Gateway) notifyAfterGrace(deadline time.Time) {
+	delay := max(time.Duration(0), time.Until(deadline))
+	select {
+	case <-g.ctx.Done():
+	case <-time.After(delay):
+		g.notifyDemandChange()
+	}
+}
+
+func (g *Gateway) notifyDemandChange() {
+	demand := g.Demand()
+	g.m.demand.Set(float64(demand))
+	active := demand > 0
+	g.subMu.Lock()
+	if active == g.lastActive {
+		g.subMu.Unlock()
+		return
+	}
+	g.lastActive = active
+	if active {
+		g.m.activationEvents.Inc()
+	}
+	for _, ch := range g.subscribers {
+		select {
+		case ch <- active:
+		default:
+			select {
+			case <-ch:
+			default:
+			}
+			ch <- active
+		}
+	}
+	g.subMu.Unlock()
+}
+
+func (g *Gateway) subscribeDemand() (<-chan bool, func()) {
+	ch := make(chan bool, 1)
+	g.subMu.Lock()
+	ch <- g.Demand() > 0
+	id := g.nextSubscriber
+	g.nextSubscriber++
+	g.subscribers[id] = ch
+	g.subMu.Unlock()
+	var once sync.Once
+	return ch, func() {
+		once.Do(func() {
+			g.subMu.Lock()
+			delete(g.subscribers, id)
+			g.subMu.Unlock()
+		})
+	}
 }
 
 // holdWithHeartbeat commits a 200 SSE response and emits keepalive comments until the

@@ -60,6 +60,21 @@ helm upgrade --install hearth ./charts/hearth \
 KEDA is optional to the reconciler: without its CRD, Hearth still creates the serving resources but
 skips the `ScaledObject`. Autoscaling and scale-to-zero are then disabled.
 
+The chart defaults to KEDA's polling `metrics-api` scaler. To push cold activation immediately,
+enable the ExternalScaler transport when installing from a source revision that includes it:
+
+```bash
+helm upgrade --install hearth ./charts/hearth \
+  --namespace hearth-system \
+  --create-namespace \
+  --set gateway.scalerMode=external-push \
+  --set gateway.replicas=1
+```
+
+External-push is an operator-wide setting and currently requires exactly one gateway replica. Set
+`gateway.scalerMode=metrics-api` to roll back without changing any `LLMService` objects. See
+[Scaler transport](architecture.md#scaler-transport) for the lifecycle and security details.
+
 ## Select one hardware profile
 
 Each directory under [`examples/<vendor>/<device>/`](../examples) contains an independently
@@ -136,7 +151,7 @@ The important relationships are:
 - `scaling.min: 0` allows KEDA to release all accelerators while idle;
 - `scaling.max` bounds backend replicas, not gateway replicas;
 - `cache.prewarm` downloads weights without consuming an accelerator; and
-- the always-on gateway exposes the OpenAI-compatible endpoint and KEDA queue signal.
+- the always-on gateway exposes the OpenAI-compatible endpoint and KEDA demand signal.
 
 The same API shape can target Ascend by pinning the matching Ascend runtime and using a compatible
 model and runtime configuration. This is API portability, not a claim that every model, image, or

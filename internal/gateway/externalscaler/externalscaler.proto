@@ -1,0 +1,66 @@
+// Copyright 2026 The Hearth Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This wire contract matches KEDA's ExternalScaler API.
+syntax = "proto3";
+
+package externalscaler;
+
+option go_package = "github.com/hearth-project/hearth/internal/gateway/externalscaler";
+
+service ExternalScaler {
+  rpc IsActive(ScaledObjectRef) returns (IsActiveResponse) {}
+  rpc StreamIsActive(ScaledObjectRef) returns (stream IsActiveResponse) {}
+  rpc GetMetricSpec(ScaledObjectRef) returns (GetMetricSpecResponse) {}
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse) {}
+}
+
+message ScaledObjectRef {
+  string name = 1;
+  string namespace = 2;
+  map<string, string> scalerMetadata = 3;
+}
+
+message IsActiveResponse {
+  bool result = 1;
+}
+
+message GetMetricSpecResponse {
+  repeated MetricSpec metricSpecs = 1;
+}
+
+message MetricSpec {
+  string metricName = 1;
+
+  // Deprecated: use targetSizeFloat.
+  int64 targetSize = 2;
+  double targetSizeFloat = 3;
+}
+
+message GetMetricsRequest {
+  ScaledObjectRef scaledObjectRef = 1;
+  string metricName = 2;
+}
+
+message GetMetricsResponse {
+  repeated MetricValue metricValues = 1;
+}
+
+message MetricValue {
+  string metricName = 1;
+
+  // Deprecated: use metricValueFloat.
+  int64 metricValue = 2;
+  double metricValueFloat = 3;
+}

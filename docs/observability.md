@@ -57,10 +57,13 @@ The gateway exports these metrics on `/metrics`:
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `hearth_gateway_pending` | Gauge | none | Requests admitted and waiting or in flight (the scaler's demand signal). |
+| `hearth_gateway_pending` | Gauge | none | Requests admitted and waiting or in flight. |
+| `hearth_gateway_demand` | Gauge | none | Effective queue value reported to KEDA, including the activation-lease floor. |
 | `hearth_gateway_requests_total` | Counter | `code` | Responses by HTTP status code. |
 | `hearth_gateway_rejections_total` | Counter | `reason` | Rejected requests by reason. |
 | `hearth_gateway_activation_wait_seconds` | Histogram | none | Time spent holding a request until the backend was ready. |
+| `hearth_gateway_scaler_streams` | Gauge | none | Connected KEDA external-push activation streams. |
+| `hearth_gateway_activation_events_total` | Counter | none | Inactive-to-active effective-demand transitions. |
 
 `hearth_gateway_rejections_total` uses reasons such as `queue_full`, `cold_start`, and
 `activation_timeout`. The activation wait histogram is exposed with the standard Prometheus

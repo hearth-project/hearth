@@ -34,11 +34,11 @@ func gatewaySvc() *servingv1alpha1.LLMService {
 func TestGatewayReplicasDefaultAndOverride(t *testing.T) {
 	g := NewWithT(t)
 
-	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 0)
+	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 0, backend.ScalerModeMetricsAPI)
 	g.Expect(dep.Spec.Replicas).NotTo(BeNil())
 	g.Expect(*dep.Spec.Replicas).To(Equal(int32(1)))
 
-	dep = backend.BuildGatewayDeployment(gatewaySvc(), "img", 3)
+	dep = backend.BuildGatewayDeployment(gatewaySvc(), "img", 3, backend.ScalerModeMetricsAPI)
 	g.Expect(*dep.Spec.Replicas).To(Equal(int32(3)))
 }
 
@@ -46,13 +46,13 @@ func TestGatewayCarriesImagePullSecrets(t *testing.T) {
 	g := NewWithT(t)
 	svc := gatewaySvc()
 	svc.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: "regcred"}}
-	dep := backend.BuildGatewayDeployment(svc, "img", 1)
+	dep := backend.BuildGatewayDeployment(svc, "img", 1, backend.ScalerModeMetricsAPI)
 	g.Expect(dep.Spec.Template.Spec.ImagePullSecrets).To(ContainElement(corev1.LocalObjectReference{Name: "regcred"}))
 }
 
 func TestGatewayPointsAtBackendService(t *testing.T) {
 	g := NewWithT(t)
-	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 1)
+	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 1, backend.ScalerModeMetricsAPI)
 	env := dep.Spec.Template.Spec.Containers[0].Env
 	var backendURL string
 	for _, e := range env {
@@ -61,6 +61,35 @@ func TestGatewayPointsAtBackendService(t *testing.T) {
 		}
 	}
 	g.Expect(backendURL).To(Equal("http://qwen3-8b-backend.ai.svc:80"))
+}
+
+func TestExternalPushGatewayExposesInternalScaler(t *testing.T) {
+	g := NewWithT(t)
+	svc := gatewaySvc()
+	dep := backend.BuildGatewayDeployment(svc, "img", 1, backend.ScalerModeExternalPush)
+	container := dep.Spec.Template.Spec.Containers[0]
+	g.Expect(container.Env).To(ContainElement(corev1.EnvVar{
+		Name:  "HEARTH_SCALER_LISTEN_ADDR",
+		Value: ":9090",
+	}))
+	g.Expect(container.Ports).To(ContainElement(corev1.ContainerPort{
+		Name: "grpc", ContainerPort: 9090, Protocol: corev1.ProtocolTCP,
+	}))
+
+	service := backend.BuildGatewayScalerService(svc)
+	g.Expect(service.Name).To(Equal("qwen3-8b-scaler"))
+	g.Expect(service.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+	g.Expect(service.Spec.Ports).To(HaveLen(1))
+	g.Expect(service.Spec.Ports[0].Name).To(Equal("grpc"))
+	g.Expect(service.Spec.Ports[0].Port).To(Equal(int32(9090)))
+}
+
+func TestMetricsAPIGatewayDoesNotExposeScalerPort(t *testing.T) {
+	g := NewWithT(t)
+	dep := backend.BuildGatewayDeployment(gatewaySvc(), "img", 1, backend.ScalerModeMetricsAPI)
+	container := dep.Spec.Template.Spec.Containers[0]
+	g.Expect(container.Env).NotTo(ContainElement(HaveField("Name", "HEARTH_SCALER_LISTEN_ADDR")))
+	g.Expect(container.Ports).NotTo(ContainElement(HaveField("Name", "grpc")))
 }
 
 func TestServicesExposeMetricsDiscoveryContract(t *testing.T) {

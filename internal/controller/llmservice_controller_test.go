@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
+	"github.com/hearth-project/hearth/internal/backend"
 	"github.com/hearth-project/hearth/internal/backend/registry"
 )
 
@@ -174,6 +176,29 @@ var _ = Describe("LLMService Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = reconciler().Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("renders and removes the internal scaler Service with external-push mode", func() {
+			r := reconciler()
+			r.ScalerMode = backend.ScalerModeExternalPush
+			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).NotTo(HaveOccurred())
+
+			gwDep := &appsv1.Deployment{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: svcName + "-gateway", Namespace: namespace}, gwDep)).To(Succeed())
+			container := gwDep.Spec.Template.Spec.Containers[0]
+			Expect(container.Env).To(ContainElement(corev1.EnvVar{Name: "HEARTH_SCALER_LISTEN_ADDR", Value: ":9090"}))
+
+			scalerService := &corev1.Service{}
+			scalerKey := types.NamespacedName{Name: svcName + "-scaler", Namespace: namespace}
+			Expect(k8sClient.Get(ctx, scalerKey, scalerService)).To(Succeed())
+			Expect(scalerService.Spec.Ports).To(HaveLen(1))
+			Expect(scalerService.Spec.Ports[0].Name).To(Equal("grpc"))
+
+			r.ScalerMode = backend.ScalerModeMetricsAPI
+			_, err = r.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, scalerKey, &corev1.Service{})).To(Satisfy(apierrors.IsNotFound))
 		})
 
 		It("marks the service Degraded when the runtime is missing", func() {

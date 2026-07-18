@@ -52,8 +52,10 @@ type LLMServiceReconciler struct {
 	// GatewayImage is the data-plane proxy image the operator deploys per LLMService.
 	GatewayImage string
 	// GatewayReplicas is the per-LLMService gateway replica count (default 1; see
-	// BuildGatewayDeployment for why >1 softens scale-from-zero today).
+	// BuildGatewayDeployment for mode-specific constraints).
 	GatewayReplicas int32
+	// ScalerMode selects KEDA's polling or streaming activation transport.
+	ScalerMode backend.ScalerMode
 }
 
 // +kubebuilder:rbac:groups=serving.hearth.dev,resources=llmservices,verbs=get;list;watch
@@ -97,11 +99,14 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if err := r.apply(ctx, &svc, backend.BuildBackendService(&svc, rt)); err != nil {
 		return r.fail(ctx, &svc, "ApplyBackendService", err)
 	}
-	if err := r.apply(ctx, &svc, backend.BuildGatewayDeployment(&svc, r.GatewayImage, r.GatewayReplicas)); err != nil {
+	if err := r.apply(ctx, &svc, backend.BuildGatewayDeployment(&svc, r.GatewayImage, r.GatewayReplicas, r.ScalerMode)); err != nil {
 		return r.fail(ctx, &svc, "ApplyGateway", err)
 	}
 	if err := r.apply(ctx, &svc, backend.BuildGatewayService(&svc)); err != nil {
 		return r.fail(ctx, &svc, "ApplyGatewayService", err)
+	}
+	if err := r.reconcileGatewayScalerService(ctx, &svc); err != nil {
+		return r.fail(ctx, &svc, "ApplyGatewayScalerService", err)
 	}
 
 	pvc, err := backend.BuildCachePVC(&svc)
@@ -124,7 +129,7 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	so, err := backend.BuildScaledObject(&svc)
+	so, err := backend.BuildScaledObject(&svc, r.ScalerMode)
 	if err != nil {
 		return r.fail(ctx, &svc, "ScaledObject", err)
 	}
@@ -139,6 +144,21 @@ func (r *LLMServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Reconciled LLMService", "runtime", rt.Name, "readyReplicas", live.Status.ReadyReplicas)
 	return r.updateStatus(ctx, &svc, rt.Name, &live)
+}
+
+func (r *LLMServiceReconciler) reconcileGatewayScalerService(ctx context.Context, svc *servingv1alpha1.LLMService) error {
+	service := backend.BuildGatewayScalerService(svc)
+	if r.ScalerMode == backend.ScalerModeExternalPush {
+		return r.apply(ctx, svc, service)
+	}
+	var live corev1.Service
+	if err := r.Get(ctx, client.ObjectKeyFromObject(service), &live); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	if !metav1.IsControlledBy(&live, svc) {
+		return nil
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, &live))
 }
 
 // resolveRuntime selects the backend: a pinned name, else the highest-priority runtime

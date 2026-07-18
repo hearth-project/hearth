@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -47,6 +48,7 @@ const (
 
 var (
 	repoRoot       string
+	scalerMode     string
 	operator       *exec.Cmd
 	operatorCancel context.CancelFunc
 	// httpClient bypasses any ambient HTTP proxy so port-forwarded localhost works.
@@ -93,6 +95,11 @@ func backendReplicas(name string) int {
 var _ = BeforeSuite(func() {
 	_, file, _, _ := runtime.Caller(0)
 	repoRoot, _ = filepath.Abs(filepath.Join(filepath.Dir(file), "..", ".."))
+	scalerMode = os.Getenv("HEARTH_E2E_SCALER_MODE")
+	if scalerMode == "" {
+		scalerMode = "metrics-api"
+	}
+	Expect([]string{"metrics-api", "external-push"}).To(ContainElement(scalerMode))
 
 	By("requiring KEDA to be installed (a component you install via Helm, not the suite)")
 	_, err := kubectl("get", "crd", "scaledobjects.keda.sh")
@@ -124,7 +131,8 @@ var _ = BeforeSuite(func() {
 		"--gateway-image="+gatewayImage,
 		"--metrics-bind-address=0",
 		"--health-probe-bind-address=:18181",
-		"--leader-elect=false")
+		"--leader-elect=false",
+		"--scaler-mode="+scalerMode)
 	operator.Dir = repoRoot
 	operator.Stdout = GinkgoWriter
 	operator.Stderr = GinkgoWriter

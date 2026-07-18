@@ -35,6 +35,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	servingv1alpha1 "github.com/hearth-project/hearth/api/v1alpha1"
+	"github.com/hearth-project/hearth/internal/backend"
 	"github.com/hearth-project/hearth/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -62,6 +63,7 @@ func main() {
 	var enableHTTP2 bool
 	var gatewayImage string
 	var gatewayReplicas int
+	var scalerModeValue string
 	var showVersion bool
 	var tlsOpts []func(*tls.Config)
 	flag.BoolVar(&showVersion, "version", false, "Print version and exit.")
@@ -82,8 +84,9 @@ func main() {
 	flag.StringVar(&gatewayImage, "gateway-image", "ghcr.io/hearth-project/hearth-gateway:latest",
 		"Container image for the per-LLMService data-plane gateway.")
 	flag.IntVar(&gatewayReplicas, "gateway-replicas", 1,
-		"Replicas for each LLMService's data-plane gateway. 1 gives crisp scale-from-zero; "+
-			">1 adds HA but softens activation until an aggregating scaler lands.")
+		"Replicas for each LLMService's data-plane gateway. external-push requires exactly 1.")
+	flag.StringVar(&scalerModeValue, "scaler-mode", string(backend.ScalerModeMetricsAPI),
+		"KEDA scaler transport: metrics-api (polling) or external-push (streaming activation).")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -95,6 +98,16 @@ func main() {
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	scalerMode, err := backend.ParseScalerMode(scalerModeValue)
+	if err != nil {
+		setupLog.Error(err, "Invalid scaler mode")
+		os.Exit(1)
+	}
+	if scalerMode == backend.ScalerModeExternalPush && gatewayReplicas != 1 {
+		setupLog.Error(fmt.Errorf("gateway replicas must be 1"), "Invalid external-push configuration",
+			"gateway-replicas", gatewayReplicas)
+		os.Exit(1)
+	}
 
 	// HTTP/2 is opt-in to limit the metrics server's attack surface.
 	disableHTTP2 := func(c *tls.Config) {
@@ -150,6 +163,7 @@ func main() {
 		Scheme:          mgr.GetScheme(),
 		GatewayImage:    gatewayImage,
 		GatewayReplicas: int32(gatewayReplicas), //nolint:gosec // small bounded flag value
+		ScalerMode:      scalerMode,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "llmservice")
 		os.Exit(1)

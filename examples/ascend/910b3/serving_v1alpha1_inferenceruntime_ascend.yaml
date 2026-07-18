@@ -53,6 +53,6 @@ spec:
     path: /metrics
     port: http
     queueDepth: vllm:num_requests_waiting
-    kvCacheUtil: vllm:gpu_cache_usage_perc
+    kvCacheUtil: vllm:kv_cache_usage_perc
     running: vllm:num_requests_running
     ttft: vllm:time_to_first_token_seconds

@@ -33,7 +33,7 @@ with no GPU:
   `[DONE]`) or returns a single JSON body. Emits `STUB_TOKEN_COUNT` tokens at `STUB_TOKEN_DELAY`
   each. A per-request **`?tokens=N`** override sets the stream length for timing-sensitive tests.
 - **`/metrics`** — Prometheus text with `vllm:num_requests_waiting`, `vllm:num_requests_running`,
-  `vllm:gpu_cache_usage_perc`, all settable at runtime via **`POST /control`** (e.g.
+  `vllm:kv_cache_usage_perc`, all settable at runtime via **`POST /control`** (e.g.
   `{"waiting": 5}`).
 
 ### Configuration
@@ -93,8 +93,11 @@ helm install keda kedacore/keda --version 2.20.1 -n keda --create-namespace
 
 ```bash
 make test-scale-e2e CONTAINER_TOOL=podman          # or omit CONTAINER_TOOL to use docker
+make test-scale-e2e SCALE_SCALER_MODE=external-push
 ```
 
 For Podman, also export `KIND_EXPERIMENTAL_PROVIDER=podman` so `kind load` targets the right
-cluster. The suite installs Hearth's own CRDs but expects KEDA to be present (it fails fast with
-instructions otherwise). CI runs the same loop on every PR via `.github/workflows/test-scale-e2e.yml`.
+cluster. The first command verifies the default polling path; the second verifies the internal
+ExternalScaler Service, KEDA stream, activation, scale-out, drain, and return to zero. The suite
+installs Hearth's own CRDs but expects KEDA to be present (it fails fast with instructions
+otherwise). CI runs both modes on every PR via `.github/workflows/test-scale-e2e.yml`.

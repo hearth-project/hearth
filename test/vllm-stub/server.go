@@ -74,7 +74,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 	}{
 		{"vllm:num_requests_waiting", m.Waiting},
 		{"vllm:num_requests_running", m.Running},
-		{"vllm:gpu_cache_usage_perc", m.KVCache},
+		{"vllm:kv_cache_usage_perc", m.KVCache},
 	} {
 		_, _ = fmt.Fprintf(w, "# TYPE %s gauge\n%s %g\n", g.name, g.name, g.val)
 	}

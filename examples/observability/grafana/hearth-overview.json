@@ -84,7 +84,7 @@
       "datasource": "${datasource}",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
       "targets": [
-        { "expr": "avg(vllm:gpu_cache_usage_perc)", "legendFormat": "kv-cache" }
+        { "expr": "avg(vllm:kv_cache_usage_perc)", "legendFormat": "kv-cache" }
       ]
     },
     {

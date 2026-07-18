@@ -132,7 +132,7 @@ func TestMetricsSettableViaControl(t *testing.T) {
 		t.Fatalf("default waiting metric missing:\n%s", got)
 	}
 
-	resp, err := http.Post(srv.URL+"/control", "application/json", strings.NewReader(`{"waiting": 5}`))
+	resp, err := http.Post(srv.URL+"/control", "application/json", strings.NewReader(`{"waiting": 5, "kv_cache": 0.25}`))
 	if err != nil {
 		t.Fatalf("POST /control: %v", err)
 	}
@@ -141,7 +141,11 @@ func TestMetricsSettableViaControl(t *testing.T) {
 		t.Fatalf("POST /control: want 200, got %d", resp.StatusCode)
 	}
 
-	if got := metrics(); !strings.Contains(got, "vllm:num_requests_waiting 5") {
+	got := metrics()
+	if !strings.Contains(got, "vllm:num_requests_waiting 5") {
 		t.Fatalf("waiting metric not updated to 5:\n%s", got)
+	}
+	if !strings.Contains(got, "vllm:kv_cache_usage_perc 0.25") {
+		t.Fatalf("KV-cache metric not updated to 0.25:\n%s", got)
 	}
 }

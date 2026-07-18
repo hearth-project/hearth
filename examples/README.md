@@ -14,6 +14,7 @@ families.
 | [`ascend/310p-duo`](ascend/310p-duo) | Two Ascend 310P3 devices (Atlas 300I Duo) | Hardware-verified `0→1→2→0`; see the [report](../docs/ascend/ascend-310p-validation.md) |
 | [`ascend/310p-pro`](ascend/310p-pro) | Ascend 310P (Atlas 300I Pro) | Manifest and rendering tested; physical validation is still required |
 | [`nvidia/a100`](nvidia/a100) | NVIDIA A100 | Hardware-verified end to end |
+| [`nvidia/a10`](nvidia/a10) | NVIDIA A10 | Hardware-verified `0→1→2→0` on two GPUs; see the [report](../docs/nvidia/a10-validation.md) |
 
 Install Hearth, KEDA, and the device plugin for the selected accelerator before applying a
 profile. For example:

@@ -1,0 +1,36 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: LLMService
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: qwen2-5-7b-a10
+spec:
+  model:
+    source:
+      uri: modelscope://Qwen/Qwen2.5-7B-Instruct
+  runtime:
+    name: vllm-nvidia-a10
+    argsOverride:
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.9
+  resources:
+    accelerators: 1
+    cpu: "8"
+    memory: 32Gi
+  scaling:
+    min: 0
+    # Raise this only when the cluster advertises more than one free A10 GPU.
+    max: 1
+    metric: queueDepth
+    target: 10
+    activationTimeout: 5m
+  cache:
+    strategy: NodeLocalPVC
+    size: 30Gi
+    prewarm: true
+  endpoint:
+    openAICompatible: true
+    coldStart:
+      mode: keepalive
+      heartbeatInterval: 10s

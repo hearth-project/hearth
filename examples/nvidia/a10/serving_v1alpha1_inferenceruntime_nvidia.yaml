@@ -1,0 +1,53 @@
+apiVersion: serving.hearth.dev/v1alpha1
+kind: InferenceRuntime
+metadata:
+  labels:
+    app.kubernetes.io/name: hearth
+    app.kubernetes.io/managed-by: kustomize
+  name: vllm-nvidia-a10
+spec:
+  family: vllm
+  vendor: nvidia
+  priority: 100
+  container:
+    image: vllm/vllm-openai:v0.25.1
+    args:
+      - "{{ .Model.Path }}"
+      - --served-model-name={{ .Service.Name }}
+      - --port=8000
+    port:
+      name: http
+      containerPort: 8000
+  accelerator:
+    resourceName: nvidia.com/gpu
+    sharing:
+      supported: false
+    nodeSelector:
+      # This product label is published by NVIDIA GPU Feature Discovery.
+      nvidia.com/gpu.product: NVIDIA-A10
+  health:
+    readiness:
+      httpGet:
+        path: /health
+        port: http
+    liveness:
+      httpGet:
+        path: /health
+        port: http
+      failureThreshold: 6
+    startup:
+      httpGet:
+        path: /health
+        port: http
+      periodSeconds: 10
+      failureThreshold: 120
+  lifecycle:
+    terminationGracePeriodSeconds: 120
+    preStopDrain: true
+  metrics:
+    path: /metrics
+    port: http
+    queueDepth: vllm:num_requests_waiting
+    kvCacheUtil: vllm:kv_cache_usage_perc
+    running: vllm:num_requests_running
+    ttft: vllm:time_to_first_token_seconds

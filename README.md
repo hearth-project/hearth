@@ -21,10 +21,11 @@ queue-driven autoscaling, and scale-to-zero. `LLMService` is the workload API;
 cluster administrators provide reusable `InferenceRuntime` profiles for the accelerators available
 in their cluster.
 
-> **Status — alpha.** Hardware validation covers NVIDIA A100, the two-device Atlas 300I Duo
-> (`0→1→2→0`), and a single-device Ascend 910B3 (`0→1→0`). Results are specific to the
-> recorded hardware and software stacks. Atlas 300I Pro remains rendering-tested only. The API is
-> `v1alpha1`, and Hearth is not production-ready for shared or customer-facing workloads.
+> **Status — alpha.** Hardware validation covers NVIDIA A100, two NVIDIA A10 GPUs
+> (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a single-device Ascend
+> 910B3 (`0→1→0`). Results are specific to the recorded hardware and software stacks. Atlas 300I
+> Pro remains rendering-tested only. The API is `v1alpha1`, and Hearth is not production-ready for
+> shared or customer-facing workloads.
 
 ## Why Hearth
 
@@ -68,13 +69,15 @@ and a KEDA `ScaledObject` when KEDA is installed.
 flowchart LR
   client([Client]) -->|OpenAI API| gateway[Hearth gateway]
   gateway --> backend[Model backend 0..N]
-  keda[KEDA] -->|Poll queue| gateway
+  keda[KEDA] -->|Push activation or poll queue| gateway
   keda -->|Scale| backend
   backend -.-> cache[(Model cache)]
 ```
 
 The gateway exposes the demand signal, buffers requests during cold start, and forwards them once
-the model is ready. See the [architecture guide](docs/architecture.md) for the full data flow.
+the model is ready. KEDA polling is the compatibility default; an opt-in ExternalScaler removes the
+poll interval from cold activation. See the [architecture guide](docs/architecture.md) for the full
+data flow and gateway-replica constraint.
 
 ## Install
 
@@ -137,6 +140,8 @@ an accelerator, use the [no-GPU development guide](docs/no-gpu-development.md).
 - [Hardware profiles](examples/README.md) — available devices and their validation level.
 - [Ascend validation](docs/ascend/ascend-validation.md) — exact stacks, evidence, and product-specific
   runbooks.
+- [NVIDIA A10 validation](docs/nvidia/a10-validation.md) — two-device lifecycle evidence and the
+  reproducible K3s runbook.
 - [Observability](docs/observability.md) — optional Prometheus and Grafana integration.
 - [Roadmap](ROADMAP.md) — current limitations and the path to production readiness.
 

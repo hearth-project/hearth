@@ -13,7 +13,8 @@ production-grade release. It's a living document.
 
 ## What v0 does today (verified)
 
-Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and multi-node) and on kind:
+Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, NVIDIA A10 and Ascend on K3s) and
+on kind:
 
 - **Declarative deploy** — one `LLMService` renders Deployment + Services + KEDA `ScaledObject` +
   optional cache and prewarm resources, with owner-ref cascade.
@@ -22,6 +23,11 @@ Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, single- and mult
   clients/ingress don't time out, holds until the model is loaded, then streams real tokens.
   Cold start ≈ **100 s (Qwen3-0.6B)** / **110 s (Qwen3-8B)** from zero, prewarmed.
 - **Queue-driven autoscaling** — `0→1→N→0` on gateway queue depth; verified `1→2` across two GPU nodes.
+- **Push activation** — an opt-in, co-located KEDA ExternalScaler streams cold-demand transitions;
+  the polling path remains the default for compatibility.
+- **NVIDIA A10 lifecycle** — two physical A10 GPUs are verified through `0→1→2→0`, streaming
+  inference, backpressure, reject mode, metrics, drain, self-heal, Helm upgrade, and reboot
+  recovery (see [NVIDIA A10 validation](docs/nvidia/a10-validation.md)).
 - **Backpressure & limits** — bounded queue → `429`; activation timeout → `503`; `reject` cold-start mode.
 - **Model caching + prewarm** — `HostPath` and `NodeLocalPVC` (incl. pinnable `storageClassName`,
   verified against Alibaba ESSD); weights hydrated before first traffic.
@@ -95,17 +101,12 @@ anything requiring auth, SLAs, or stability guarantees.
 - [ ] **Minimal gateway auth** — static API keys on the OpenAI endpoint (explicitly *not*
       multi-tenancy yet). Today any in-cluster caller can hit any model.
 - [ ] **Gateway HA hardening** — default is 1 replica (SPOF). Add `PodDisruptionBudget` +
-      pod anti-affinity, and **aggregate the demand signal across replicas** (KEDA currently polls a
-      single gateway's pending count, which softens activation at >1 replica).
+      pod anti-affinity, and **aggregate the demand signal across replicas**. External-push enforces
+      one gateway replica; polling with more than one replica has an incomplete per-Pod view.
 - [ ] **Operator HA** — verify leader-election failover.
 - [ ] **API stabilization** → `v1beta1` with validation/conversion webhooks; document compatibility.
 - [ ] **Test depth** — soak + failure-injection (node/pod loss, GPU failure) on top of the existing
       no-GPU CI loop.
-
-### Community track (help wanted)
-- [ ] **KEDA external push scaler**
-      ([#42](https://github.com/hearth-project/hearth/issues/42)) — gRPC `StreamIsActive` push for
-      instant `0→1` activation instead of polling; removes the `demandLinger` workaround.
 
 ### Demand-driven backlog (parked, not abandoned — built when a named user asks)
 - `ModelCatalog` CRD + curated Qwen/DeepSeek/GLM presets (`catalogRef` is unimplemented today).

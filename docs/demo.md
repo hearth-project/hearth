@@ -8,7 +8,7 @@ This silent, hardware-neutral demo shows two serving policies sharing one Kubern
   connection alive with SSE heartbeats.
 - Volcano schedules both workloads without making the scheduler part of Hearth itself.
 
-[![Watch the Hearth and Kthena operational demo](imgs/demo.png)](imgs/demo.mp4)
+https://github.com/user-attachments/assets/2d217dad-0280-4509-8793-dfd13ce0cdfa
 
 The 50-second recording uses real `kubectl` and `curl` commands. Hardware names, device UUIDs,
 drivers, registry addresses, and validation namespaces are intentionally omitted so the operational

@@ -30,7 +30,7 @@ in their cluster.
 
 ## Demo
 
-[![Watch Hearth and Kthena serve hot and long-tail models](docs/imgs/demo.png)](docs/imgs/demo.mp4)
+https://github.com/user-attachments/assets/2d217dad-0280-4509-8793-dfd13ce0cdfa
 
 In this 50-second, hardware-neutral recording, Kthena keeps a hot model ready while a real request
 activates a Hearth-managed long-tail model from zero and lets it return to zero afterward. See the

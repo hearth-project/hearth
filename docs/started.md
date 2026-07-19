@@ -1,4 +1,4 @@
-# Getting started
+# Started
 
 This guide installs a released Hearth control plane, deploys one hardware profile, and sends a
 request through the scale-to-zero gateway. For contributor workflows, see
@@ -84,23 +84,23 @@ resource advertised by the installed device plugin. The validation matrix in
 [`examples/README.md`](../examples/README.md) distinguishes physical validation from rendering-only
 coverage.
 
-For example, the NVIDIA A100 profile expects `nvidia.com/gpu`, a default dynamic StorageClass with
-at least 60 GiB available, and outbound access to ModelScope. From the current source checkout,
-apply it with:
+For example, the NVIDIA A10 profile expects `nvidia.com/gpu`, the exact
+`nvidia.com/gpu.product=NVIDIA-A10` node label, a default dynamic StorageClass with at least 30 GiB
+available, and outbound access to ModelScope. From the current source checkout, apply it with:
 
 ```bash
 kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n ai -k examples/nvidia/a100
+kubectl apply -n ai -k examples/nvidia/a10
 
-kubectl get inferenceruntime vllm-nvidia-a100
+kubectl get inferenceruntime vllm-nvidia-a10
 kubectl get llmservice -n ai
 ```
 
-The current profile uses vLLM `v0.25.1` and the positional model argument. Its workload lifecycle
-was previously validated on A100 with vLLM `v0.22.0`; run a focused A100 validation before treating
-the upgraded image/profile combination as hardware-verified. The profile does not guess an A100
-GPU Feature Discovery product value because the exact validated SKU label was not recorded. On a
-mixed NVIDIA cluster, add the node's exact `nvidia.com/gpu.product` value before deploying.
+The A10 profile uses vLLM `v0.25.1` and its positional model argument. Its whole-device lifecycle
+was physically validated through `0→1→2→0`; see the
+[A10 validation report](nvidia/a10-validation.md). GPU Feature Discovery or equivalent platform
+automation should publish the exact product label. In a focused lab, apply it manually only after
+confirming the hardware identity with `nvidia-smi`.
 
 `InferenceRuntime` is cluster-scoped. `LLMService` and all generated workloads are created in the
 `ai` namespace. If several equal-priority runtimes for the same vendor are installed, pin
@@ -111,22 +111,22 @@ All bundled profiles use `NodeLocalPVC`. If the cluster has no default StorageCl
 
 ## Understand the LLMService
 
-The A100 profile includes the following workload shape. It pins the runtime so deployment does not
+The A10 profile includes the following workload shape. It pins the runtime so deployment does not
 depend on vendor-selection priority:
 
 ```yaml
 apiVersion: serving.hearth.dev/v1alpha1
 kind: LLMService
 metadata:
-  name: qwen3-8b-a100
+  name: qwen2-5-7b-a10
 spec:
   model:
     source:
-      uri: modelscope://Qwen/Qwen3-8B-Instruct
+      uri: modelscope://Qwen/Qwen2.5-7B-Instruct
   runtime:
-    name: vllm-nvidia-a100
+    name: vllm-nvidia-a10
     argsOverride:
-      - --max-model-len=8192
+      - --max-model-len=4096
       - --gpu-memory-utilization=0.9
   resources:
     accelerators: 1
@@ -140,7 +140,7 @@ spec:
     activationTimeout: 5m
   cache:
     strategy: NodeLocalPVC
-    size: 60Gi
+    size: 30Gi
     prewarm: true
   endpoint:
     openAICompatible: true
@@ -159,7 +159,7 @@ The important relationships are:
 - the always-on gateway exposes the OpenAI-compatible endpoint and KEDA demand signal.
 
 The checked-in `scaling.max: 1` is a safe default. Raise it only after confirming the cluster has
-additional free A100 GPUs; each backend replica requests one whole `nvidia.com/gpu` resource.
+additional free A10 GPUs; each backend replica requests one whole `nvidia.com/gpu` resource.
 
 The same API shape can target Ascend by pinning the matching Ascend runtime and using a compatible
 model and runtime configuration. This is API portability, not a claim that every model, image, or
@@ -173,12 +173,12 @@ Watch the resources created for the service:
 kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
 ```
 
-The prewarm Job hydrates `qwen3-8b-a100-cache`. When no request is pending, KEDA can hold the backend
+The prewarm Job hydrates `qwen2-5-7b-a10-cache`. When no request is pending, KEDA can hold the backend
 Deployment at zero while the gateway remains available. Inspect failures with:
 
 ```bash
-kubectl describe llmservice qwen3-8b-a100 -n ai
-kubectl logs job/qwen3-8b-a100-prewarm -n ai
+kubectl describe llmservice qwen2-5-7b-a10 -n ai
+kubectl logs job/qwen2-5-7b-a10-prewarm -n ai
 kubectl get events -n ai --sort-by=.lastTimestamp
 ```
 
@@ -187,7 +187,7 @@ kubectl get events -n ai --sort-by=.lastTimestamp
 Forward the gateway Service from one terminal:
 
 ```bash
-kubectl port-forward service/qwen3-8b-a100 8000:80 -n ai
+kubectl port-forward service/qwen2-5-7b-a10 8000:80 -n ai
 ```
 
 Then send a streaming request from another terminal:
@@ -196,7 +196,7 @@ Then send a streaming request from another terminal:
 curl -N http://127.0.0.1:8000/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "qwen3-8b-a100",
+    "model": "qwen2-5-7b-a10",
     "messages": [{"role": "user", "content": "Reply with one short sentence."}],
     "stream": true
   }'
@@ -229,10 +229,10 @@ Cache PVCs and prewarm Jobs contain immutable fields and are created once. Chang
 cache configuration may require intentionally replacing those resources; see
 [Caching](architecture.md#caching).
 
-The current A100 example renames `vllm-nvidia` to `vllm-nvidia-a100` and `qwen3-8b` to
-`qwen3-8b-a100`. Kubernetes does not interpret those as in-place renames. When migrating from the
-v0.2.0 example, deploy and validate the new service, preserve any cache data you need, then remove
-the legacy service and remove the old cluster-scoped runtime only after confirming nothing uses it.
+Kubernetes does not interpret a renamed example runtime or service as an in-place update. When an
+alpha release changes example identities, deploy and validate the new service, preserve any cache
+data you need, then remove the legacy service and remove the old cluster-scoped runtime only after
+confirming nothing uses it. Review the [changelog](../CHANGELOG.md) before upgrading.
 
 ## Clean up
 
@@ -240,7 +240,7 @@ Delete the service profile before removing the operator. The profile also contai
 runtime, so confirm that no other service uses it:
 
 ```bash
-kubectl delete -n ai -k examples/nvidia/a100
+kubectl delete -n ai -k examples/nvidia/a10
 helm uninstall hearth --namespace hearth-system
 ```
 

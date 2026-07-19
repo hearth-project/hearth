@@ -100,7 +100,7 @@ recovery.
 ### Validation boundaries
 
 - HAMi, fractional GPU sharing, MIG, multi-node scheduling, and gang scheduling were not validated.
-- Prometheus Operator and Grafana were not installed; metrics endpoints were inspected directly.
+- `kube-prometheus-stack` was not installed; metrics endpoints were inspected directly.
 - GPU Feature Discovery could not be pulled from `registry.k8s.io` in this environment. The exact
   A10 label was applied manually only after hardware identity was verified with `nvidia-smi`.
 - The Kthena router's K3s LoadBalancer helper remained Pending because Traefik occupied the required

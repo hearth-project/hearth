@@ -65,7 +65,7 @@ Observed functional results:
   reboot preserved the expected service and cache state. Post-reboot inference again completed and
   returned to zero.
 
-Prometheus Operator, Volcano, and HAMi were not installed during this run. Monitoring remained
+`kube-prometheus-stack`, Volcano, and HAMi were not installed during this run. Monitoring remained
 optional, and no multi-replica claim is made from the one-device result.
 
 ## 1. Record the environment

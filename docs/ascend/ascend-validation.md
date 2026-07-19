@@ -17,10 +17,10 @@ commands live in the [910B report](ascend-910b-validation.md) and the
 | Cluster services | Ascend Device Plugin and KEDA images compatible with the cluster | Ascend Device Plugin and KEDA images compatible with the cluster |
 
 Use the same release tag for both Hearth images. The prewarm Job reuses the vLLM image, and the
-smoke model is downloaded into that container rather than packaged as an image. Prometheus Operator
-images are optional unless metrics collection is part of the validation. Hearth does not pin the
-device-plugin or KEDA images because their compatible versions depend on the host and cluster; record
-the exact images and digests used by the validation environment.
+smoke model is downloaded into that container rather than packaged as an image.
+`kube-prometheus-stack` is optional unless metrics collection is part of the validation. Hearth
+does not pin the device-plugin or KEDA images because their compatible versions depend on the host
+and cluster; record the exact images and digests used by the validation environment.
 
 Before deployment, record the server model, OS, architecture, firmware, driver, CANN, device-plugin,
 container-runtime, Kubernetes, and KEDA versions. Also record every image by digest. Tags alone are

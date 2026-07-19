@@ -126,9 +126,10 @@ required.
 ## Observability
 
 vLLM and the gateway expose `/metrics` through Services with a stable `http` port and
-`serving.hearth.dev/llmservice` discovery label. Hearth does not install or reconcile Prometheus
-Operator resources. The independent [`examples/observability`](../examples/observability) package
-provides an opt-in `ServiceMonitor` and Grafana dashboard.
+`serving.hearth.dev/llmservice` discovery label. Hearth does not install or manage
+`kube-prometheus-stack` or other monitoring resources. The independent
+[`examples/observability`](../examples/observability) package provides an opt-in `ServiceMonitor`
+and Grafana dashboard.
 
 ## Caching
 

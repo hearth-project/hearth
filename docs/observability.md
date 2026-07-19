@@ -1,8 +1,6 @@
 # Observability
 
 Hearth exposes Prometheus metrics from both the always-on gateway and the selected backend runtime.
-It does not install or reconcile Prometheus, Grafana, or Prometheus Operator resources. Monitoring
-can therefore be deployed, replaced, or removed without changing the serving control plane.
 
 The generated gateway and backend Services expose a named `http` port and carry both of these
 stable discovery labels:
@@ -12,21 +10,49 @@ app.kubernetes.io/managed-by=hearth
 serving.hearth.dev/llmservice=<llmservice-name>
 ```
 
-## Install the optional ServiceMonitor
+## Install kube-prometheus-stack (optional)
+
+The Hearth profile uses the `monitoring.coreos.com/v1` `ServiceMonitor` CRD. If the cluster does not
+already provide that CRD and a compatible Prometheus instance, install
+[`kube-prometheus-stack`](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack).
+The stack also includes Grafana.
+
+The chart selects only its own `ServiceMonitor` labels by default. Save this minimal override as
+`monitoring-values.yaml` so Prometheus can discover the independent Hearth profile across workload
+namespaces:
+
+```yaml
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+```
+
+```bash
+helm upgrade --install kube-prometheus-stack \
+  oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack \
+  -n monitoring --create-namespace \
+  -f monitoring-values.yaml
+```
+
+An empty namespace selector discovers `ServiceMonitor` objects in every namespace. In a shared or
+multi-tenant cluster, replace it with a label selector for only the namespaces Prometheus may
+scrape.
+
+## Apply the Hearth ServiceMonitor
 
 The independent [`examples/observability/prometheus`](../examples/observability/prometheus) profile
-selects both Services in one workload namespace and scrapes `/metrics` every 15 seconds. Install the
-Prometheus Operator separately, then apply the profile once in each namespace containing
-`LLMService` objects:
+selects both Services in one workload namespace and scrapes `/metrics` every 15 seconds. Apply the
+profile once in each namespace containing `LLMService` objects:
 
 ```bash
 kubectl apply -k examples/observability/prometheus -n ai
 ```
 
-The Prometheus instance must be configured to discover `ServiceMonitor` objects in that namespace
-and accept the profile's labels. The example matches the bundled runtimes, which expose metrics at
-`/metrics`; customize it for a runtime that uses a different path. Hearth serving and autoscaling
-continue normally when the profile or Prometheus Operator is absent.
+The Prometheus instance must discover `ServiceMonitor` objects in that namespace and accept the
+profile's labels. The example matches the bundled runtimes, which expose metrics at `/metrics`;
+customize it for a runtime that uses a different path. Hearth serving and autoscaling continue
+normally when either the monitoring stack or this profile is absent.
 
 ## Import the Grafana dashboard
 
@@ -39,12 +65,12 @@ continue normally when the profile or Prometheus Operator is absent.
 The dashboard expects Prometheus to scrape Hearth gateway metrics and the backend vLLM `/metrics`
 endpoint through the optional discovery configuration above.
 
-## Remove legacy controller-owned monitors
+## Upgrade cleanup from v0.1.0
 
-Hearth versions before monitoring was decoupled created one `ServiceMonitor` per `LLMService`.
-Those resources retain owner references and disappear when their service is deleted, but an upgrade
-does not otherwise remove them. Delete legacy monitors when adopting the independent profile to
-avoid duplicate scrape targets:
+Hearth v0.1.0 created one controller-owned `ServiceMonitor` per `LLMService`. Those resources retain
+owner references and disappear when their service is deleted, but upgrading Hearth does not
+otherwise remove them. Delete them once when adopting the independent profile to avoid duplicate
+scrape targets:
 
 ```bash
 kubectl delete servicemonitors.monitoring.coreos.com -A \

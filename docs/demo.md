@@ -10,11 +10,6 @@ This silent, hardware-neutral demo shows two serving policies sharing one Kubern
 
 https://github.com/user-attachments/assets/2d217dad-0280-4509-8793-dfd13ce0cdfa
 
-The 50-second recording uses real `kubectl` and `curl` commands. Hardware names, device UUIDs,
-drivers, registry addresses, and validation namespaces are intentionally omitted so the operational
-story applies to any accelerator supported by an installed device plugin and matching runtime
-profile.
-
 ## What the recording proves
 
 1. The Kthena-managed hot model is Ready while the Hearth `LLMService` is `ScaledToZero`.
@@ -23,10 +18,6 @@ profile.
 4. KEDA activates the backend, and Kubernetes reports the backend Pod becoming Ready.
 5. The Hearth route returns a real OpenAI-compatible response.
 6. When demand ends, the Hearth backend returns to zero while the Kthena model remains Running.
-
-The video is product evidence, not a substitute for a hardware-validation report. The exact host,
-images, component versions, timings, failure tests, and known limitations are recorded in the
-[NVIDIA A10 validation report](nvidia/a10-validation.md).
 
 ## Observe the same lifecycle
 

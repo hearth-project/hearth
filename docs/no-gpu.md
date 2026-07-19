@@ -1,14 +1,13 @@
-# Developing Hearth without a GPU
+# Developing Hearth without an accelerator
 
-You can build, test, and exercise almost all of Hearth — the operator, the data-plane gateway, and
-the **scale-to-zero logic** — on a laptop with no accelerator. The only thing that genuinely needs an
-NVIDIA GPU (or an Ascend NPU) is serving *real* model tokens; everything else is faked by the
-`vllm-stub`.
+You can build, test, and exercise the operator, gateway, and scale-to-zero lifecycle on a CPU-only
+workstation. The `vllm-stub` replaces the inference process for these tests. Real accelerator-backed
+inference and hardware support claims still require validation on the physical device.
 
 This guide complements [`CONTRIBUTING.md`](../CONTRIBUTING.md), which covers running the control
 plane against a cluster.
 
-## What runs with no hardware
+## What runs without accelerator hardware
 
 | Check | Command | What it covers |
 |---|---|---|
@@ -23,8 +22,8 @@ accelerator. Rendering tests live under `internal/backend/*/`.
 ## The `vllm-stub`
 
 `test/vllm-stub/` is a CPU-only fake of a vLLM OpenAI server. It exposes the surfaces used by the
-gateway and optional observability checks, so the gateway + KEDA scale-to-zero path can run on kind
-with no GPU:
+gateway and optional observability checks, so the gateway + KEDA scale-to-zero path can run on Kind
+without an accelerator:
 
 - **`/health`** — returns `503` until `STUB_STARTUP_DELAY` has elapsed since boot, then `200`. This
   drives the gateway's cold-start keepalive and `activationTimeout` paths (mimics vLLM only going
@@ -52,52 +51,55 @@ make docker-build-stub                      # uses CONTAINER_TOOL (docker by def
 make docker-build-stub CONTAINER_TOOL=podman
 ```
 
-**Podman + kind:** `kind load docker-image` reads docker's store, so for podman-built images load
-from an archive instead, and tell kind to use podman:
+**Podman + Kind:** `kind load docker-image` reads Docker's store, so for Podman-built images load
+from an archive instead, and tell Kind to use Podman:
 
 ```bash
 podman save hearth.dev/vllm-stub:e2e -o /tmp/stub.tar
 KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive /tmp/stub.tar --name <cluster>
 ```
 
-### Try it directly
-
-```bash
-docker run -d --name stub -p 8000:8000 \
-  -e STUB_STARTUP_DELAY=2s -e STUB_TOKEN_COUNT=3 hearth.dev/vllm-stub:e2e
-
-curl -s localhost:8000/health                       # 503 for the first 2s, then 200
-curl -s localhost:8000/v1/chat/completions -d '{"stream":true,"messages":[]}'
-curl -s localhost:8000/metrics | grep waiting       # vllm:num_requests_waiting 0
-curl -s localhost:8000/control -d '{"waiting":5}'    # raise the gauge
-curl -s 'localhost:8000/v1/completions?tokens=2' -d '{"stream":true}'  # 2-token stream
-```
-
-> If `localhost` requests hang or 502 behind a corporate proxy, set
-> `NO_PROXY=localhost,127.0.0.1`.
-
-## Full scale-to-zero loop on kind
+## Full scale-to-zero loop on Kind
 
 The end-to-end `0→1→N→0` loop (idle → cold request wakes the backend → autoscale → drain back to
-zero, plus reject-mode 503) runs on kind with **no GPU**, in `test/scaletozero/`. It backs each
+zero, plus reject-mode 503) runs on Kind without an accelerator, in `test/scaletozero/`. It backs each
 `LLMService` with the stub, advertises a fake accelerator resource on the node (via the node-status
 API, so no device plugin), and runs the operator out-of-cluster.
 
-**Prerequisites you provide:** a running Kind cluster (current kube-context) with **KEDA** installed:
+The suite mutates an existing cluster and expects both a Kind cluster named `kind` and the current
+kube-context to be `kind-kind`. Use a dedicated disposable cluster. For Podman, export the two
+variables before creating it; Docker users can omit them.
 
 ```bash
-helm install keda kedacore/keda --version 2.20.1 -n keda --create-namespace
+# Podman only:
+# export CONTAINER_TOOL=podman
+# export KIND_EXPERIMENTAL_PROVIDER=podman
+
+kind create cluster --name kind --wait 120s
+test "$(kubectl config current-context)" = "kind-kind"
+
+helm repo add kedacore https://kedacore.github.io/charts  
+helm repo update
+helm upgrade --install keda kedacore/keda \
+  --version 2.20.1 \
+  -n keda --create-namespace
 ```
 
-**Run it** (builds + loads the stub and gateway images, then runs the suite):
+The KEDA version above matches `.github/workflows/test-scale-e2e.yml`. Then run both scaler modes;
+each command builds and loads the stub and gateway images before starting the suite:
 
 ```bash
-make test-scale-e2e CONTAINER_TOOL=podman          # or omit CONTAINER_TOOL to use docker
+make test-scale-e2e
 make test-scale-e2e SCALE_SCALER_MODE=external-push
 ```
 
-For Podman, also export `KIND_EXPERIMENTAL_PROVIDER=podman` so `kind load` targets the right
-cluster. The first command verifies the default polling path; the second verifies the internal
-ExternalScaler Service, KEDA stream, activation, scale-out, drain, and return to zero. The suite
-installs Hearth's own CRDs but expects KEDA to be present (it fails fast with instructions
-otherwise). CI runs both modes on every PR via `.github/workflows/test-scale-e2e.yml`.
+The first command verifies the default metrics API polling path; the second verifies the internal
+external-push scaler Service, KEDA stream, activation, scale-out, drain, and return to zero. The
+suite installs Hearth's CRDs but expects KEDA to be present and fails fast when it is not. It does
+not delete the cluster afterward:
+
+```bash
+kind delete cluster --name kind
+```
+
+CI runs both modes on every PR via `.github/workflows/test-scale-e2e.yml`.

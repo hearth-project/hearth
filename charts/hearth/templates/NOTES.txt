@@ -14,13 +14,17 @@ Prerequisite for scale-to-zero (Hearth degrades gracefully without it):
 Prometheus and Grafana are independent, opt-in integrations. Hearth does not
 create their resources; see examples/observability in the project repository.
 
-Try it:
+Try the physically validated NVIDIA A10 profile (requires an NVIDIA device
+plugin, nvidia.com/gpu.product=NVIDIA-A10, and a default StorageClass with
+at least 30 GiB available):
   1. Register a backend:
-       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/main/examples/nvidia/a100/serving_v1alpha1_inferenceruntime_nvidia.yaml
-  2. Deploy a model:
-       kubectl apply -n {{ .Release.Namespace }} -f https://raw.githubusercontent.com/hearth-project/hearth/main/examples/nvidia/a100/serving_v1alpha1_llmservice_nvidia.yaml
-  3. Watch it:
-       kubectl get llmservice -n {{ .Release.Namespace }} -w
+       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/v{{ .Chart.AppVersion }}/examples/nvidia/a10/serving_v1alpha1_inferenceruntime_nvidia.yaml
+  2. Create a workload namespace:
+       kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
+  3. Deploy a model:
+       kubectl apply -n ai -f https://raw.githubusercontent.com/hearth-project/hearth/v{{ .Chart.AppVersion }}/examples/nvidia/a10/serving_v1alpha1_llmservice_nvidia.yaml
+  4. Watch it:
+       kubectl get llmservice -n ai -w
 
 Note: serving real tokens requires a node with a supported accelerator
 (e.g. an NVIDIA GPU + device plugin). Without one, the backend stays Pending.

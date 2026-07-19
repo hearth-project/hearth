@@ -28,6 +28,14 @@ in their cluster.
 > upgraded `v0.25.1` profile requires focused A100 revalidation. The API is `v1alpha1`, and Hearth
 > is not production-ready for shared or customer-facing workloads.
 
+## Demo
+
+[![Watch Hearth and Kthena serve hot and long-tail models](docs/assets/hearth-kthena-demo.png)](docs/assets/hearth-kthena-demo.mp4)
+
+In this 50-second, hardware-neutral recording, Kthena keeps a hot model ready while a real request
+activates a Hearth-managed long-tail model from zero and lets it return to zero afterward. See the
+[operational demo](docs/hearth-kthena-demo.md) for the commands, scope, and hardware evidence.
+
 ## Why Hearth
 
 - **Scale-to-zero is the center of gravity.** An always-on gateway holds or rejects cold requests
@@ -58,7 +66,9 @@ a serious multi-model serving estate, **use Kthena — it's excellent.** Hearth 
 of the same axis: a handful of occasionally-used models on a handful of cards, where you want the
 smallest possible footprint — one manifest, KEDA, done. The two compose naturally on one cluster:
 **hot, high-traffic models on Kthena; the long tail scaled to zero with Hearth**, on the same
-(Volcano-schedulable) silicon.
+(Volcano-schedulable) silicon. This split has been exercised with real inference on two physical
+accelerators; see the [operational demo](docs/hearth-kthena-demo.md) and
+[validation report](docs/nvidia/a10-validation.md).
 
 ## Architecture
 
@@ -109,15 +119,15 @@ upgrade considerations, and cleanup.
 
 ## Quickstart
 
-Choose exactly one profile matching the installed accelerator device plugin. This A100 example
-also expects a default dynamic StorageClass with at least 60 GiB available and access to
-ModelScope. From a source checkout:
+Choose exactly one profile matching the installed accelerator device plugin. This A10 example
+expects the exact `nvidia.com/gpu.product=NVIDIA-A10` node label, a default dynamic StorageClass
+with at least 30 GiB available, and access to ModelScope. From a source checkout:
 
 ```bash
 kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n ai -k examples/nvidia/a100
+kubectl apply -n ai -k examples/nvidia/a10
 
-kubectl get inferenceruntime vllm-nvidia-a100
+kubectl get inferenceruntime vllm-nvidia-a10
 kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
 ```
 
@@ -134,6 +144,8 @@ an accelerator, use the [no-GPU development guide](docs/no-gpu-development.md).
 - [Getting started](docs/getting-started.md) — installation, profile selection, inference, upgrades,
   and cleanup.
 - [Architecture](docs/architecture.md) — component boundaries and the scale-to-zero data flow.
+- [Hearth and Kthena demo](docs/hearth-kthena-demo.md) — a command-driven hot-model and long-tail
+  model serving walkthrough.
 - [CRD reference](docs/crd-reference.md) — `LLMService` and `InferenceRuntime` fields.
 - [Hardware profiles](examples/README.md) — available devices and their validation level.
 - [Ascend validation](docs/ascend/ascend-validation.md) — exact stacks, evidence, and product-specific

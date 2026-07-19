@@ -4,13 +4,13 @@ metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: qwen3-8b
+  name: qwen3-8b-a100
 spec:
   model:
     source:
       uri: modelscope://Qwen/Qwen3-8B-Instruct
   runtime:
-    name: vllm-nvidia
+    name: vllm-nvidia-a100
     argsOverride:
       - --max-model-len=8192
       - --gpu-memory-utilization=0.9
@@ -20,7 +20,8 @@ spec:
     memory: 32Gi
   scaling:
     min: 0
-    max: 3
+    # Raise this only when the cluster advertises additional free A100 GPUs.
+    max: 1
     metric: queueDepth
     target: 10
     activationTimeout: 5m

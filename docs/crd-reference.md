@@ -26,7 +26,7 @@ admitted by the alpha schema but reported as `Degraded` until those reserved pat
 | `spec.model.source.secretRef` | object | - | Reserved for private model sources; currently rejected during reconciliation. |
 | `spec.model.source.secretRef.name` | string | `""` | Name of the Secret holding source credentials. |
 | `spec.runtime` | object | - | Backend runtime selection. Pin a runtime by name or provide a vendor preference selector. |
-| `spec.runtime.name` | string | - | Exact `InferenceRuntime` name to use, such as `vllm-nvidia`. |
+| `spec.runtime.name` | string | - | Exact `InferenceRuntime` name to use, such as `vllm-nvidia-a100`. |
 | `spec.runtime.selector` | object | - | Runtime auto-selection criteria. |
 | `spec.runtime.selector.vendor` | string array | - | Acceptable vendors in preference order, for example `["nvidia", "ascend"]`. |
 | `spec.runtime.argsOverride` | string array | - | Arguments appended after the selected runtime's templated arguments. A duplicate flag may override an earlier value when supported by the runtime CLI. |

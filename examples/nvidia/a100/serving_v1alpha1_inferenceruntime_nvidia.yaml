@@ -1,20 +1,20 @@
 apiVersion: serving.hearth.dev/v1alpha1
 kind: InferenceRuntime
-# Hardware-validated on NVIDIA A100. The standard nvidia.com/gpu resource keeps
-# the runtime usable on other vLLM-compatible NVIDIA devices.
+# The A100 lifecycle was validated with vLLM v0.22.0. This upgraded runtime
+# requires focused A100 revalidation before its exact stack is claimed as verified.
 metadata:
   labels:
     app.kubernetes.io/name: hearth
     app.kubernetes.io/managed-by: kustomize
-  name: vllm-nvidia
+  name: vllm-nvidia-a100
 spec:
   family: vllm
   vendor: nvidia
   priority: 100
   container:
-    image: vllm/vllm-openai:v0.22.0
+    image: vllm/vllm-openai:v0.25.1
     args:
-      - --model={{ .Model.Path }}
+      - "{{ .Model.Path }}"
       - --served-model-name={{ .Service.Name }}
       - --port=8000
     port:

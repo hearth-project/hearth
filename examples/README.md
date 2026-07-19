@@ -13,7 +13,7 @@ families.
 | [`ascend/910b3`](ascend/910b3) | Ascend 910B3 (Atlas A2) | Hardware-verified single-device `0→1→0`; see the [report](../docs/ascend/ascend-910b-validation.md) |
 | [`ascend/310p-duo`](ascend/310p-duo) | Two Ascend 310P3 devices (Atlas 300I Duo) | Hardware-verified `0→1→2→0`; see the [report](../docs/ascend/ascend-310p-validation.md) |
 | [`ascend/310p-pro`](ascend/310p-pro) | Ascend 310P (Atlas 300I Pro) | Manifest and rendering tested; physical validation is still required |
-| [`nvidia/a100`](nvidia/a100) | NVIDIA A100 | Hardware-verified end to end |
+| [`nvidia/a100`](nvidia/a100) | NVIDIA A100 | Lifecycle verified with vLLM `v0.22.0`; current `v0.25.1` profile awaits focused revalidation |
 | [`nvidia/a10`](nvidia/a10) | NVIDIA A10 | Hardware-verified `0→1→2→0` on two GPUs; see the [report](../docs/nvidia/a10-validation.md) |
 
 Install Hearth, KEDA, and the device plugin for the selected accelerator before applying a
@@ -27,6 +27,10 @@ kubectl apply -k examples/ascend/310p-duo -n ai
 `InferenceRuntime` is cluster-scoped; `LLMService` is created in the namespace selected by `-n`.
 All bundled service profiles use `NodeLocalPVC`. Ensure the cluster has a default dynamic
 StorageClass, or set `cache.storageClassName` before applying a profile.
+
+The A100 profile does not guess a `nvidia.com/gpu.product` value because the recorded validation
+does not identify the exact PCIe/SXM and memory SKU label. Add the exact label reported by the
+target cluster before using this profile in a mixed NVIDIA node pool.
 
 ## Optional observability
 

@@ -15,6 +15,9 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - Helm and the manager accept `gateway.scalerMode` / `--scaler-mode`; `metrics-api` remains the
   compatibility default and `external-push` requires one gateway replica.
+- The A100 example now uses device-specific `vllm-nvidia-a100` / `qwen3-8b-a100` names, vLLM
+  `v0.25.1`, the positional model argument, and a conservative one-replica default. Its historical
+  hardware evidence remains tied to vLLM `v0.22.0` pending focused revalidation of the new stack.
 
 ## [0.2.0] - 2026-07-17
 

@@ -84,18 +84,22 @@ resource advertised by the installed device plugin. The validation matrix in
 coverage.
 
 For example, the NVIDIA A100 profile expects `nvidia.com/gpu`, a default dynamic StorageClass with
-at least 60 GiB available, and outbound access to ModelScope:
+at least 60 GiB available, and outbound access to ModelScope. From the current source checkout,
+apply it with:
 
 ```bash
-HEARTH_VERSION=0.2.0
-PROFILE_URL="https://github.com/hearth-project/hearth//examples/nvidia/a100?ref=v${HEARTH_VERSION}"
-
 kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n ai -k "${PROFILE_URL}"
+kubectl apply -n ai -k examples/nvidia/a100
 
-kubectl get inferenceruntime vllm-nvidia
+kubectl get inferenceruntime vllm-nvidia-a100
 kubectl get llmservice -n ai
 ```
+
+The current profile uses vLLM `v0.25.1` and the positional model argument. Its workload lifecycle
+was previously validated on A100 with vLLM `v0.22.0`; run a focused A100 validation before treating
+the upgraded image/profile combination as hardware-verified. The profile does not guess an A100
+GPU Feature Discovery product value because the exact validated SKU label was not recorded. On a
+mixed NVIDIA cluster, add the node's exact `nvidia.com/gpu.product` value before deploying.
 
 `InferenceRuntime` is cluster-scoped. `LLMService` and all generated workloads are created in the
 `ai` namespace. If several equal-priority runtimes for the same vendor are installed, pin
@@ -113,13 +117,13 @@ depend on vendor-selection priority:
 apiVersion: serving.hearth.dev/v1alpha1
 kind: LLMService
 metadata:
-  name: qwen3-8b
+  name: qwen3-8b-a100
 spec:
   model:
     source:
       uri: modelscope://Qwen/Qwen3-8B-Instruct
   runtime:
-    name: vllm-nvidia
+    name: vllm-nvidia-a100
     argsOverride:
       - --max-model-len=8192
       - --gpu-memory-utilization=0.9
@@ -129,7 +133,7 @@ spec:
     memory: 32Gi
   scaling:
     min: 0
-    max: 3
+    max: 1
     metric: queueDepth
     target: 10
     activationTimeout: 5m
@@ -153,6 +157,9 @@ The important relationships are:
 - `cache.prewarm` downloads weights without consuming an accelerator; and
 - the always-on gateway exposes the OpenAI-compatible endpoint and KEDA demand signal.
 
+The checked-in `scaling.max: 1` is a safe default. Raise it only after confirming the cluster has
+additional free A100 GPUs; each backend replica requests one whole `nvidia.com/gpu` resource.
+
 The same API shape can target Ascend by pinning the matching Ascend runtime and using a compatible
 model and runtime configuration. This is API portability, not a claim that every model, image, or
 runtime flag is interchangeable between devices.
@@ -165,12 +172,12 @@ Watch the resources created for the service:
 kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
 ```
 
-The prewarm Job hydrates `qwen3-8b-cache`. When no request is pending, KEDA can hold the backend
+The prewarm Job hydrates `qwen3-8b-a100-cache`. When no request is pending, KEDA can hold the backend
 Deployment at zero while the gateway remains available. Inspect failures with:
 
 ```bash
-kubectl describe llmservice qwen3-8b -n ai
-kubectl logs job/qwen3-8b-prewarm -n ai
+kubectl describe llmservice qwen3-8b-a100 -n ai
+kubectl logs job/qwen3-8b-a100-prewarm -n ai
 kubectl get events -n ai --sort-by=.lastTimestamp
 ```
 
@@ -179,7 +186,7 @@ kubectl get events -n ai --sort-by=.lastTimestamp
 Forward the gateway Service from one terminal:
 
 ```bash
-kubectl port-forward service/qwen3-8b 8000:80 -n ai
+kubectl port-forward service/qwen3-8b-a100 8000:80 -n ai
 ```
 
 Then send a streaming request from another terminal:
@@ -188,7 +195,7 @@ Then send a streaming request from another terminal:
 curl -N http://127.0.0.1:8000/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -d '{
-    "model": "qwen3-8b",
+    "model": "qwen3-8b-a100",
     "messages": [{"role": "user", "content": "Reply with one short sentence."}],
     "stream": true
   }'
@@ -221,16 +228,18 @@ Cache PVCs and prewarm Jobs contain immutable fields and are created once. Chang
 cache configuration may require intentionally replacing those resources; see
 [Caching](architecture.md#caching).
 
+The current A100 example renames `vllm-nvidia` to `vllm-nvidia-a100` and `qwen3-8b` to
+`qwen3-8b-a100`. Kubernetes does not interpret those as in-place renames. When migrating from the
+v0.2.0 example, deploy and validate the new service, preserve any cache data you need, then remove
+the legacy service and remove the old cluster-scoped runtime only after confirming nothing uses it.
+
 ## Clean up
 
 Delete the service profile before removing the operator. The profile also contains a cluster-scoped
 runtime, so confirm that no other service uses it:
 
 ```bash
-HEARTH_VERSION=0.2.0
-PROFILE_URL="https://github.com/hearth-project/hearth//examples/nvidia/a100?ref=v${HEARTH_VERSION}"
-
-kubectl delete -n ai -k "${PROFILE_URL}"
+kubectl delete -n ai -k examples/nvidia/a100
 helm uninstall hearth --namespace hearth-system
 ```
 

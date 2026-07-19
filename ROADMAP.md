@@ -14,7 +14,8 @@ production-grade release. It's a living document.
 ## What v0 does today (verified)
 
 Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, NVIDIA A10 and Ascend on K3s) and
-on kind:
+on kind. The A100 lifecycle evidence used vLLM `v0.22.0`; the checked-in `v0.25.1` profile awaits
+focused A100 revalidation:
 
 - **Declarative deploy** — one `LLMService` renders Deployment + Services + KEDA `ScaledObject` +
   optional cache and prewarm resources, with owner-ref cascade.

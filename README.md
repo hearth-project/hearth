@@ -24,8 +24,9 @@ in their cluster.
 > **Status — alpha.** Hardware validation covers NVIDIA A100, two NVIDIA A10 GPUs
 > (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a single-device Ascend
 > 910B3 (`0→1→0`). Results are specific to the recorded hardware and software stacks. Atlas 300I
-> Pro remains rendering-tested only. The API is `v1alpha1`, and Hearth is not production-ready for
-> shared or customer-facing workloads.
+> Pro remains rendering-tested only. The A100 result used vLLM `v0.22.0`; the upgraded `v0.25.1`
+> profile requires focused A100 revalidation. The API is `v1alpha1`, and Hearth is not
+> production-ready for shared or customer-facing workloads.
 
 ## Why Hearth
 
@@ -110,16 +111,13 @@ upgrade considerations, and cleanup.
 
 Choose exactly one profile matching the installed accelerator device plugin. This A100 example
 also expects a default dynamic StorageClass with at least 60 GiB available and access to
-ModelScope:
+ModelScope. From a source checkout:
 
 ```bash
-HEARTH_VERSION=0.2.0
-PROFILE_URL="https://github.com/hearth-project/hearth//examples/nvidia/a100?ref=v${HEARTH_VERSION}"
-
 kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n ai -k "${PROFILE_URL}"
+kubectl apply -n ai -k examples/nvidia/a100
 
-kubectl get inferenceruntime vllm-nvidia
+kubectl get inferenceruntime vllm-nvidia-a100
 kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
 ```
 

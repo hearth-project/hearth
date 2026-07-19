@@ -117,7 +117,7 @@ kubectl get node <npu-node> -L accelerator
 ## 4. Prepare Hearth
 
 Use a dedicated cluster and namespace. Confirm the context, then install KEDA and Hearth by
-following [Getting started](../getting-started.md):
+following [Getting started](../started.md):
 
 ```bash
 kubectl config current-context

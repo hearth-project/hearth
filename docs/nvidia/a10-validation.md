@@ -15,7 +15,7 @@ is recorded below and does not change the Hearth result. The run follows the off
 [NVIDIA device-plugin documentation](https://github.com/NVIDIA/k8s-device-plugin), and
 [vLLM OpenAI-compatible server documentation](https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/).
 
-The hardware-neutral [Hearth and Kthena demo](../hearth-kthena-demo.md) shows the core lifecycle
+The hardware-neutral [Hearth and Kthena demo](../demo.md) shows the core lifecycle
 with real `kubectl` and `curl` commands.
 
 ## Validation baseline
@@ -237,7 +237,7 @@ kubectl apply -n hearth-a10-validation -f \
 
 This is an alternative to `kubectl apply -k examples/nvidia/a10`, not a second step after it.
 Kthena workloads and queues are installed and managed independently; see the
-[operational demo](../hearth-kthena-demo.md) for the coexistence boundary.
+[operational demo](../demo.md) for the coexistence boundary.
 
 On a lab with two otherwise-idle A10 GPUs, raise the maximum only for the scale-out test:
 

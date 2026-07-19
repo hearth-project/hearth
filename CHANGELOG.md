@@ -6,16 +6,46 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-19
+
+This alpha release adds immediate push-based cold activation, a current NVIDIA A10 profile, and
+expanded real-accelerator evidence for Hearth alongside Volcano and Kthena. The API remains
+`v1alpha1`, and Hearth is not production-ready for shared or customer-facing workloads.
+
 ### Added
+- An opt-in, co-located KEDA ExternalScaler that streams cold activation immediately while retaining
+  queue metrics for scale-out, scale-down, observability, and rollback.
+- An activation lease for reject-mode cold starts, including current-state replay across scaler
+  reconnects and a no-GPU E2E mode for the external-push path.
+- An NVIDIA A10 profile and reproducible K3s validation report for vLLM `v0.25.1`.
 - A hardware-neutral, command-driven Hearth and Kthena demo showing a hot model alongside a
   long-tail model that activates from zero and returns to zero.
 
+### Changed
+- Helm and the manager accept `gateway.scalerMode` / `--scaler-mode`; `metrics-api` remains the
+  compatibility default and `external-push` requires one gateway replica.
+- The A100 example now uses device-specific names, vLLM `v0.25.1`, the positional model argument,
+  and a conservative one-replica default. Its historical hardware evidence remains tied to vLLM
+  `v0.22.0` pending focused revalidation of the new stack.
+- The primary quickstart now uses the physically validated A10 profile.
+
+### Removed
+- The redundant standalone A100 HostPath manifest. `cache.strategy: HostPath` remains available in
+  the API; bundled profiles consistently use `NodeLocalPVC` and require a dynamic StorageClass.
+
+### Fixed
+- Use vLLM's current `vllm:kv_cache_usage_perc` metric in all runtime profiles, the CPU stub, and
+  the optional Grafana dashboard.
+- Correct the recorded Ascend 910B3 identity and tighten the evidence boundaries in the 910B3 and
+  310P validation reports.
+- Keep prerelease image publication from moving the stable `latest` operator and gateway tags.
+
 ### Verified
-- Hearth v0.3.0-rc.1 on two physical NVIDIA A10 GPUs with vLLM `v0.25.1`, KEDA external-push,
-  prewarming, `0→1→2→0`, bounded admission, reject mode, graceful drain, component replacement,
-  and host reboot recovery.
-- Volcano `v1.15.0` scheduled the real A10 workloads through separate queues and placed two Hearth
-  replicas on distinct whole GPUs.
+- The v0.3.0-rc.1 release build completed the full Hearth lifecycle on two physical NVIDIA A10 GPUs
+  with vLLM `v0.25.1`, KEDA external-push, prewarming, `0→1→2→0`, bounded admission, reject mode,
+  graceful drain, component replacement, and host reboot recovery.
+- Volcano `v1.15.0` enforced queue placement and quota on Kind, then scheduled the real A10
+  workloads through separate queues and placed two Hearth replicas on distinct whole GPUs.
 - A Kthena-managed hot model and a Hearth-managed long-tail model served concurrently on the same
   host. Hearth recovered automatically after reboot; the documented Kthena device-admission race
   required manual Pod replacement and remains outside Hearth's controller boundary.
@@ -174,7 +204,7 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 - **Observability** — per-gateway Prometheus metrics, `ServiceMonitor`, and a Grafana dashboard.
 - **No-GPU test harness** — a CPU `vllm-stub` and a kind + KEDA e2e that runs the full
   `0→1→N→0` loop, backpressure (`429`/`503`), and graceful drain on every PR, no accelerator
-  required, plus a [no-GPU development guide](docs/no-gpu-development.md).
+  required, plus a [no-GPU development guide](docs/no-gpu.md).
 - **Packaging** — Helm chart (operator + RBAC + CRDs) and multi-arch image build/release workflow.
 - **Project scaffolding** — README, ROADMAP, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, MAINTAINERS,
   GOVERNANCE, issue/PR templates, and a DCO check.
@@ -182,7 +212,8 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 ### Changed
 - Operator skips no-op `LLMService` status updates, avoiding optimistic-concurrency churn.
 
-[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.3.0-rc.1...HEAD
+[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hearth-project/hearth/compare/v0.3.0-rc.1...v0.3.0
 [0.3.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.2.0...v0.3.0-rc.1
 [0.2.0]: https://github.com/hearth-project/hearth/compare/v0.2.0-rc.1...v0.2.0
 [0.2.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.1.0...v0.2.0-rc.1

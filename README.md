@@ -21,7 +21,7 @@ queue-driven autoscaling, and scale-to-zero. `LLMService` is the workload API;
 cluster administrators provide reusable `InferenceRuntime` profiles for the accelerators available
 in their cluster.
 
-> **Status — `v0.3.0-rc.1` (alpha release candidate).** Hardware validation covers NVIDIA A100,
+> **Status — `v0.3.0` (alpha).** Hardware validation covers NVIDIA A100,
 > two NVIDIA A10 GPUs (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a
 > single-device Ascend 910B3 (`0→1→0`). Results are specific to the recorded hardware and software
 > stacks. Atlas 300I Pro remains rendering-tested only. The A100 result used vLLM `v0.22.0`; the
@@ -30,11 +30,11 @@ in their cluster.
 
 ## Demo
 
-[![Watch Hearth and Kthena serve hot and long-tail models](docs/assets/hearth-kthena-demo.png)](docs/assets/hearth-kthena-demo.mp4)
+[![Watch Hearth and Kthena serve hot and long-tail models](docs/imgs/demo.png)](docs/imgs/demo.mp4)
 
 In this 50-second, hardware-neutral recording, Kthena keeps a hot model ready while a real request
 activates a Hearth-managed long-tail model from zero and lets it return to zero afterward. See the
-[operational demo](docs/hearth-kthena-demo.md) for the commands, scope, and hardware evidence.
+[operational demo](docs/demo.md) for the commands, scope, and hardware evidence.
 
 ## Why Hearth
 
@@ -67,7 +67,7 @@ of the same axis: a handful of occasionally-used models on a handful of cards, w
 smallest possible footprint — one manifest, KEDA, done. The two compose naturally on one cluster:
 **hot, high-traffic models on Kthena; the long tail scaled to zero with Hearth**, on the same
 (Volcano-schedulable) silicon. This split has been exercised with real inference on two physical
-accelerators; see the [operational demo](docs/hearth-kthena-demo.md) and
+accelerators; see the [operational demo](docs/demo.md) and
 [validation report](docs/nvidia/a10-validation.md).
 
 ## Architecture
@@ -97,7 +97,7 @@ autoscaling or scale-to-zero. Drivers and device plugins are hardware prerequisi
 installed by Hearth.
 
 ```bash
-HEARTH_VERSION=0.3.0-rc.1
+HEARTH_VERSION=0.3.0
 
 helm repo add kedacore https://kedacore.github.io/charts --force-update
 helm upgrade --install keda kedacore/keda \
@@ -114,7 +114,7 @@ kubectl rollout status deployment/hearth-controller-manager -n hearth-system
 ```
 
 This installs the CRDs, RBAC, operator, and the version-matched operator and gateway image
-configuration. See [Getting started](docs/getting-started.md) for source-checkout installation,
+configuration. See [Getting started](docs/started.md) for source-checkout installation,
 upgrade considerations, and cleanup.
 
 ## Quickstart
@@ -133,18 +133,18 @@ kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
 
 The profile installs a cluster-scoped runtime and a namespaced `LLMService`. Its prewarm Job first
 downloads the model; the first request then activates the backend from zero. Follow the
-[LLMService walkthrough](docs/getting-started.md#understand-the-llmservice) to call the endpoint and
+[LLMService walkthrough](docs/started.md#understand-the-llmservice) to call the endpoint and
 observe the lifecycle.
 
 For other devices, select a profile from [`examples/`](examples). To exercise the full loop without
-an accelerator, use the [no-GPU development guide](docs/no-gpu-development.md).
+an accelerator, use the [no-GPU development guide](docs/no-gpu.md).
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md) — installation, profile selection, inference, upgrades,
+- [Getting started](docs/started.md) — installation, profile selection, inference, upgrades,
   and cleanup.
 - [Architecture](docs/architecture.md) — component boundaries and the scale-to-zero data flow.
-- [Hearth and Kthena demo](docs/hearth-kthena-demo.md) — a command-driven hot-model and long-tail
+- [Hearth and Kthena demo](docs/demo.md) — a command-driven hot-model and long-tail
   model serving walkthrough.
 - [CRD reference](docs/crd-reference.md) — `LLMService` and `InferenceRuntime` fields.
 - [Hardware profiles](examples/README.md) — available devices and their validation level.

@@ -3,7 +3,7 @@
 This guide installs a released Hearth control plane, deploys one hardware profile, and sends a
 request through the scale-to-zero gateway. For contributor workflows, see
 [CONTRIBUTING.md](../CONTRIBUTING.md). For a complete loop without an accelerator, see
-[Developing without a GPU](no-gpu-development.md).
+[Developing without a GPU](no-gpu.md).
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ The release publishes matching operator and gateway images and attaches a packag
 the GitHub release:
 
 ```bash
-HEARTH_VERSION=0.3.0-rc.1
+HEARTH_VERSION=0.3.0
 
 helm repo add kedacore https://kedacore.github.io/charts --force-update
 helm upgrade --install keda kedacore/keda \

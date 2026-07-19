@@ -4,7 +4,7 @@
 > self-hosted OSS LLMs on Kubernetes — is implemented and verified end-to-end on real hardware.
 > The API is `v1alpha1` (no stability guarantee). **Not production-ready for shared or
 > customer-facing workloads** — see [Production readiness](#production-readiness).
-> Current pre-release: **`v0.3.0-rc.1`**. Latest stable release: **`v0.2.0`**.
+> Current release: **`v0.3.0` (alpha)**.
 
 This roadmap is honest about what works, what it's good for today, and the prioritized path to a
 production-grade release. It's a living document.

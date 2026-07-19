@@ -26,9 +26,10 @@ focused A100 revalidation:
 - **Queue-driven autoscaling** — `0→1→N→0` on gateway queue depth; verified `1→2` across two GPU nodes.
 - **Push activation** — an opt-in, co-located KEDA ExternalScaler streams cold-demand transitions;
   the polling path remains the default for compatibility.
-- **NVIDIA A10 lifecycle** — two physical A10 GPUs are verified through `0→1→2→0`, streaming
-  inference, backpressure, reject mode, metrics, drain, self-heal, Helm upgrade, and reboot
-  recovery (see [NVIDIA A10 validation](docs/nvidia/a10-validation.md)).
+- **NVIDIA A10 lifecycle** — two physical A10 GPUs are verified through external-push
+  `0→1→2→0`, streaming inference, backpressure, reject mode, metrics, drain, self-heal, Helm
+  upgrade, Volcano scheduling, and reboot recovery (see
+  [NVIDIA A10 validation](docs/nvidia/a10-validation.md)).
 - **Backpressure & limits** — bounded queue → `429`; activation timeout → `503`; `reject` cold-start mode.
 - **Model caching + prewarm** — `HostPath` and `NodeLocalPVC` (incl. pinnable `storageClassName`,
   verified against Alibaba ESSD); weights hydrated before first traffic.
@@ -80,9 +81,14 @@ anything requiring auth, SLAs, or stability guarantees.
   self-heal, Helm upgrade, and reboot recovery.
 - [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
   the [310P report and runbook](docs/ascend/ascend-310p-validation.md).
-- [x] **Volcano live validation** — Volcano `v1.15.0` on a three-node Kind cluster enforced queue
-  placement and quota, then scheduled Hearth's `0→1→0` path using the CPU stub and a fake extended
-  resource. Real-accelerator topology, HAMi sharing, and gang scheduling remain separate work.
+- [x] **Volcano live validation** — Volcano `v1.15.0` enforced queue placement and quota on a
+  three-node Kind cluster, then scheduled Hearth's external-push `0→1→2→0` path on two physical A10
+  GPUs with distinct whole-device allocations. Multi-node accelerator topology, HAMi sharing, and
+  gang scheduling remain separate work.
+- [x] **Hearth and Kthena coexistence** — a Kthena-managed hot model and a Hearth-managed long-tail
+  model served concurrently on the same two-GPU host. Hearth recovered automatically after reboot;
+  Kthena required manual Pod replacement after an early device-plugin admission race, so unattended
+  combined-stack reboot recovery remains unverified.
 
 ### P1 — unblock private / enterprise delivery
 - [x] **`imagePullSecrets`** — private-registry support on backend, prewarm, and gateway Pods.

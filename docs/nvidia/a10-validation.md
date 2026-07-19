@@ -4,13 +4,19 @@
 
 | Profile | Validation level | Status |
 |---|---|---|
-| NVIDIA A10 | Scale-to-zero verified | Full `0 -> 1 -> 2 -> 0` lifecycle passed on two physical 24 GB GPUs on 2026-07-18. |
+| NVIDIA A10 | Scale-to-zero and coexistence verified | Hearth v0.3.0-rc.1 passed `0 -> 1 -> 2 -> 0` on two physical 24 GB GPUs on 2026-07-19. |
 
-The result covers the operator, NVIDIA device plugin, KEDA, gateway, model cache, and vLLM on the
-recorded stack. It follows the official [NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html),
+The current result covers the operator, gateway, NVIDIA device plugin, KEDA external-push scaler,
+Volcano scheduling, model cache, vLLM, and concurrent operation with a Kthena-managed hot model.
+Hearth recovered automatically after a real host reboot. A separate Kthena recovery qualification
+is recorded below and does not change the Hearth result. The run follows the official
+[NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html),
 [K3s NVIDIA runtime guidance](https://docs.k3s.io/advanced#nvidia-container-runtime-support),
 [NVIDIA device-plugin documentation](https://github.com/NVIDIA/k8s-device-plugin), and
 [vLLM OpenAI-compatible server documentation](https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/).
+
+The hardware-neutral [Hearth and Kthena demo](../hearth-kthena-demo.md) shows the core lifecycle
+with real `kubectl` and `curl` commands.
 
 ## Validation baseline
 
@@ -23,68 +29,84 @@ recorded stack. It follows the official [NVIDIA Container Toolkit installation g
 | Smoke model | `Qwen/Qwen2.5-7B-Instruct` from ModelScope |
 | Context limit | Explicit `--max-model-len=4096` |
 | GPU memory target | `--gpu-memory-utilization=0.9` |
-| Default replica limit | `scaling.max: 1`; raise only for additional free A10 GPUs |
+| Autoscaling | KEDA `2.20.1`, external-push mode |
+| Scheduling | Volcano `1.15.0`, with separate queues for Hearth and Kthena |
+| Replica limit | `scaling.max: 1` normally; temporarily raised to `2` for the two-GPU test |
 | Drain timeout | `120s` |
+| Cache | 30 GiB `NodeLocalPVC` with prewarming |
 
-## Physical result — 2026-07-18
+## Physical result — 2026-07-19
 
 | Item | Observed value |
 |---|---|
-| Accelerator | Two physical NVIDIA A10 GPUs; 23,028 MiB each; compute capability 8.6 |
-| Host | x86-64 Ubuntu 24.04.2 LTS; 32 vCPU; 125 GiB RAM; kernel `6.8.0-90-generic` |
-| Driver | NVIDIA `570.133.20`; host `nvidia-smi` reported CUDA 12.8 |
-| Kubernetes | K3s `v1.36.2+k3s1`; containerd `2.3.2-k3s2` |
+| Accelerator | Two physical NVIDIA A10 GPUs; 23,028 MiB each; PHB topology; no NVLink |
+| Host | x86-64 Ubuntu 22.04; 32 vCPU; 125 GiB RAM; kernel `5.15.0-125-generic` |
+| Driver | NVIDIA `550.90.07` |
+| Kubernetes | K3s `v1.36.2+k3s1` |
 | Helm / KEDA | Helm `4.2.3`; KEDA `2.20.1` |
-| NVIDIA integration | Container Toolkit `1.19.1-1`; device plugin `0.19.3`; whole-GPU mode |
-| vLLM image | Internal mirror `registry-huabei2.crs-internal.ctyun.cn/hearth-dev/vllm-openai:v0.25.1`; digest `sha256:cbebbf65f838251ba7457b4104f53b38dfdbefe54e5b64ad1d0b286ab08a5d82` |
-| Hearth images | Operator `0.2.0` (`sha256:233810ad62972e28c247383295cd6d81ea40f4155d81a164da8524470a830402`); gateway `0.2.0` (`sha256:d977fe854a409ecdea06bf27689fddd1b164e9894f90e6c53c92d24c56c8a242`) |
+| Volcano / Kthena | Volcano `1.15.0`; Kthena `1.0.0` |
+| NVIDIA integration | Container Toolkit `1.19.1`; device plugin `0.19.3`; whole-GPU mode |
+| vLLM image | `registry-huabei2.crs-internal.ctyun.cn/hearth-dev/vllm-openai:v0.25.1`; immutable digest was not retained |
+| Hearth images | `registry-huabei2.crs-internal.ctyun.cn/hearth-dev/hearth:0.3.0-rc.1` and `hearth-gateway:0.3.0-rc.1`; immutable digests were not retained |
 | Model / cache | `Qwen/Qwen2.5-7B-Instruct`; 30 GiB NodeLocalPVC on a dedicated 120 GB ext4 data disk |
 
-The checked-in profile defaults to one replica and the public vLLM image reference. For this
-two-device validation, `spec.scaling.max` was raised to `2` and the supplied internal image mirror
-was used. The model, resources, probes, lifecycle, cache, and endpoint settings matched the
-profile.
+The checked-in profile deliberately remains scheduler-neutral and uses the public vLLM image. The
+integration run used internal image mirrors, selected Volcano with a `hearth-longtail` queue, set a
+queue target of one for deterministic scale-out, and temporarily raised `spec.scaling.max` to `2`.
+The model, positional vLLM argument, accelerator request, resources, probes, lifecycle, cache, and
+metrics matched the checked-in profile. Volcano is not baked into the base profile because it is an
+optional cluster integration.
 
 Observed functional results:
 
-- The device plugin advertised exactly two `nvidia.com/gpu` resources. A one-GPU PyTorch CUDA
-  matrix multiplication passed before Hearth was deployed and again after device-plugin recovery.
-- The prewarm Job downloaded about 15 GB without requesting a GPU. Its byte count and file
-  fingerprint were unchanged after a full host reboot.
-- A cold streaming request drove `0 -> 1`, received 13 gateway heartbeats, and completed with real
-  model tokens, `[DONE]`, and HTTP 200 in `140.03s`. Warm JSON and streaming requests completed in
-  `0.299s` and `0.297s`.
-- Twenty-four concurrent requests drove `1 -> 2`; both Pods became Ready on distinct physical GPU
-  UUIDs, and all 24 streams returned HTTP 200 with `[DONE]`.
-- KEDA completed `2 -> 1 -> 0`, respected the configured stabilization window, and released both
-  GPUs.
-- Reject mode returned `503` with `Retry-After`. After the 100-request queue filled, the next five
-  requests returned `429` with `Retry-After`.
-- A 512-token stream completed with `[DONE]` after its serving Pod was deleted. The Pod honored the
-  full `120s` pre-stop drain before termination.
+- The device plugin advertised exactly two `nvidia.com/gpu` resources. A one-GPU CUDA matrix
+  operation passed in the supplied vLLM image.
+- The accelerator-free prewarm Job completed in `6m43s`. The cache used about 15 GB across 18 files
+  and retained fingerprint
+  `b69e9c0308766121393edf2a8b924f5c6f9bbc6d444e910ce9694ad6d615959b` after reboot.
+- A cold request drove `0 -> 1` through the external-push scaler, received SSE heartbeats, and
+  completed with real model output and HTTP 200 in `91.876s`.
+- Six pending requests drove `1 -> 2`; Volcano scheduled two Ready Pods on distinct physical GPU
+  UUIDs. Direct inference through both Pods returned HTTP 200, followed by observed `2 -> 1 -> 0`.
+- Kthena served a hot model while Hearth used the other GPU. Both generated 512 tokens concurrently
+  in about `16.6s`; both requests returned HTTP 200 and both GPUs reached 100% sampled utilization.
+- A 105-client cold burst produced exactly 100 admitted HTTP 200 heartbeat streams and five HTTP
+  429 responses. Gateway counters matched the observed results.
+- Reject mode returned HTTP 503 with `Retry-After: 10`, while the activation lease kept external
+  demand active. A later warm request returned HTTP 200.
+- A streaming request completed with HTTP 200 and `[DONE]` after its exact backend Pod was deleted;
+  the configured pre-stop drain protected the in-flight stream.
 - vLLM exposed `vllm:kv_cache_usage_perc`, queue, running-request, and time-to-first-token metrics.
-  The removed `vllm:gpu_cache_usage_perc` metric was absent, as expected for this release.
-- A no-op apply, operator replacement, gateway replacement, same-values Helm upgrade, and device
-  plugin replacement preserved the expected resources and restored service.
-- After a full host reboot, K3s, KEDA, Hearth, the device plugin, GPU capacity, object identities,
-  and cached weights recovered. The first post-reboot request returned HTTP 200 with `[DONE]` in
-  `211.74s`, including 20 gateway heartbeats.
-- The deprecated `--model` form emitted a vLLM removal warning. After the profile was corrected to
-  use the positional model argument, a fresh cold request completed in `110.78s` with HTTP 200 and
-  `[DONE]`, and the warning was absent from the backend log.
+- Same-values Helm upgrade and replacement of the Hearth controller, gateway, KEDA operator,
+  Volcano scheduler, Kthena controller, and NVIDIA device plugin all converged with new Pod UIDs.
+- After a real host reboot, the data disk remounted, the cache fingerprint was unchanged, GPU
+  capacity returned to two, and Hearth recovered automatically in `ScaledToZero` with its gateway
+  Ready.
+- A fractional accelerator request was rejected at render time with an explicit unsupported error
+  and created no owned workload, which is the expected boundary for this whole-GPU profile.
 
-The post-reboot weight load took `90.18s`, compared with `2.72s` while the host page cache was warm.
-This was a local-filesystem read, not a model download, and remained within the profile's five-minute
-activation timeout.
+### Kthena reboot-recovery qualification
 
-Prometheus Operator, Grafana, GPU sharing, MIG, multi-node scheduling, and automatic GPU Feature
-Discovery labeling were not tested. The focused single-node lab used exact product labels derived
-from `nvidia-smi`; production clusters should automate trustworthy hardware labeling.
+During the host reboot, the Kthena serving Pod was admitted before the NVIDIA device plugin had
+healthy devices and ended in `Completed` after an `UnexpectedAdmissionError`. Kthena did not
+recreate that terminal Pod during an observation period longer than two minutes, despite its
+`ServingGroupRecreate` recovery policy. Deleting the failed Pod manually caused immediate
+recreation with a new UID, and the route then returned HTTP 200.
 
-Two non-blocking log findings remain. The supplied vLLM image injects four unrecognized
-`VLLM_BUILD_*` environment variables, which is image-packaging noise rather than a Hearth runtime
-failure. During concurrent spec and status changes, the controller also logged three optimistic
-update conflicts; each retry converged without resource loss or service interruption.
+Hearth recovered without manual intervention. Treat this as a Kthena/device-plugin startup-order
+recovery gap and test it independently before relying on the combined stack for unattended reboot
+recovery.
+
+### Validation boundaries
+
+- HAMi, fractional GPU sharing, MIG, multi-node scheduling, and gang scheduling were not validated.
+- Prometheus Operator and Grafana were not installed; metrics endpoints were inspected directly.
+- GPU Feature Discovery could not be pulled from `registry.k8s.io` in this environment. The exact
+  A10 label was applied manually only after hardware identity was verified with `nvidia-smi`.
+- The Kthena router's K3s LoadBalancer helper remained Pending because Traefik occupied the required
+  host ports. Routing was verified through the in-cluster Service.
+- Exact image tags were recorded, but immutable image digests were not retained. Pin and record
+  digests when repeating the run for supply-chain or release provenance.
 
 ## 1. Record the environment
 
@@ -176,7 +198,8 @@ ConfigMap because K3s regenerates packaged manifests.
 
 ## 5. Deploy the A10 profile
 
-Install Hearth and KEDA first, then apply the independent profile to a dedicated namespace:
+Install Hearth and KEDA first. For the default Kubernetes scheduler, apply the independent profile
+to a dedicated namespace:
 
 ```bash
 kubectl create namespace hearth-a10-validation
@@ -185,6 +208,36 @@ kubectl get inferenceruntime vllm-nvidia-a10
 kubectl get llmservice,pvc,job,deploy,pod,scaledobject \
   -n hearth-a10-validation -w
 ```
+
+The base profile deliberately does not require Volcano. To repeat the optional Volcano path,
+configure the runtime before creating the `LLMService`; the prewarm Job is immutable and inherits
+the scheduler only when it is first created:
+
+```yaml
+apiVersion: scheduling.volcano.sh/v1beta1
+kind: Queue
+metadata:
+  name: hearth-longtail
+spec:
+  parent: root
+  weight: 1
+  reclaimable: true
+```
+
+```bash
+kubectl create namespace hearth-a10-validation
+kubectl apply -f queue.yaml
+kubectl apply -f \
+  examples/nvidia/a10/serving_v1alpha1_inferenceruntime_nvidia.yaml
+kubectl patch inferenceruntime vllm-nvidia-a10 --type merge \
+  -p '{"spec":{"accelerator":{"scheduler":{"name":"volcano","queue":"hearth-longtail"}}}}'
+kubectl apply -n hearth-a10-validation -f \
+  examples/nvidia/a10/serving_v1alpha1_llmservice_nvidia.yaml
+```
+
+This is an alternative to `kubectl apply -k examples/nvidia/a10`, not a second step after it.
+Kthena workloads and queues are installed and managed independently; see the
+[operational demo](../hearth-kthena-demo.md) for the coexistence boundary.
 
 On a lab with two otherwise-idle A10 GPUs, raise the maximum only for the scale-out test:
 
@@ -236,10 +289,15 @@ For a complete validation, retain object UIDs and cache fingerprints before each
 - no-op profile reapply;
 - operator and gateway Pod replacement;
 - same-values Hearth Helm upgrade;
+- KEDA and optional scheduler/controller replacement;
 - device-plugin Pod replacement and a fresh CUDA smoke Pod;
 - in-flight streaming completion during backend Pod deletion; and
 - full host reboot with persistent data-disk mount, cache identity, GPU capacity, and post-reboot
   inference.
+
+If another serving system shares the cluster, verify its route and recovery independently before
+and after disruptive tests. A successful Hearth recovery does not establish another controller's
+recovery behavior.
 
 Do not run destructive recovery tests on a shared or production cluster.
 
@@ -283,6 +341,20 @@ probe history. The A10 profile uses the positional model argument required by cu
 Inspect prewarming, scheduling, startup, and readiness before increasing `activationTimeout`. A
 longer timeout does not repair missing devices, an incompatible image, or failed model loading.
 
+### Kthena Pod stays terminal after reboot
+
+Wait until the NVIDIA device plugin is Ready and the node advertises its expected allocatable GPU
+count. Then inspect the Pod event before deciding whether to replace it:
+
+```bash
+kubectl get node \
+  -o custom-columns='NAME:.metadata.name,GPUS:.status.allocatable.nvidia\.com/gpu'
+kubectl describe pod -n <kthena-workload-namespace> <serving-pod>
+```
+
+In the recorded run, deleting the terminal serving Pod let Kthena recreate it after the device
+plugin recovered. This is a Kthena/device-plugin recovery workaround, not Hearth reconciliation.
+
 ## Success criteria
 
 The A10 profile passes physical validation only when:
@@ -292,6 +364,14 @@ The A10 profile passes physical validation only when:
 - the backend receives one whole GPU and `/health` gates readiness correctly;
 - cold and warm OpenAI-compatible streaming requests complete through the gateway with `[DONE]`;
 - KEDA completes an observed `0 -> 1 -> configured max -> 0` loop and releases the GPUs;
+- external-push activation is claimed only after the ScaledObject becomes active from real gateway
+  demand and returns inactive after scale-down;
 - multiple replicas use distinct physical allocations when `max` is greater than one;
 - an in-flight stream completes during backend termination; and
-- the driver, toolkit, device plugin, image digests, cache identity, logs, and timings are recorded.
+- the driver, toolkit, device plugin, exact image references, cache identity, logs, and timings are
+  recorded; retain immutable image digests when release provenance requires reproducibility beyond
+  a mutable registry tag.
+
+Kthena coexistence is a separate integration claim. It additionally requires concurrent successful
+inference through both systems, distinct whole-GPU allocations, independent controller recovery,
+and explicit recording of any reboot qualification.

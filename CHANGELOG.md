@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- A hardware-neutral, command-driven Hearth and Kthena demo showing a hot model alongside a
+  long-tail model that activates from zero and returns to zero.
+
+### Verified
+- Hearth v0.3.0-rc.1 on two physical NVIDIA A10 GPUs with vLLM `v0.25.1`, KEDA external-push,
+  prewarming, `0→1→2→0`, bounded admission, reject mode, graceful drain, component replacement,
+  and host reboot recovery.
+- Volcano `v1.15.0` scheduled the real A10 workloads through separate queues and placed two Hearth
+  replicas on distinct whole GPUs.
+- A Kthena-managed hot model and a Hearth-managed long-tail model served concurrently on the same
+  host. Hearth recovered automatically after reboot; the documented Kthena device-admission race
+  required manual Pod replacement and remains outside Hearth's controller boundary.
+
 ## [0.3.0-rc.1] - 2026-07-19
 
 This release candidate adds immediate push-based cold activation and a physically validated NVIDIA

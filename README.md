@@ -12,29 +12,34 @@ Declarative, scale-to-zero LLM serving for NVIDIA and Ascend runtimes.
 [![CI](https://github.com/hearth-project/hearth/actions/workflows/test.yml/badge.svg)](https://github.com/hearth-project/hearth/actions/workflows/test.yml)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](ROADMAP.md)
 
-[**Install**](#install) · [**Quickstart**](#quickstart) · [**Documentation**](docs/README.md) · [**Roadmap**](ROADMAP.md) · [**Contributing**](CONTRIBUTING.md)
-
 </div>
 
-Hearth turns a model and a runtime choice into a Kubernetes deployment with model caching,
-queue-driven autoscaling, and scale-to-zero. `LLMService` is the workload API;
-cluster administrators provide reusable `InferenceRuntime` profiles for the accelerators available
-in their cluster.
+## Overview
 
-> **Status — `v0.3.0` (alpha).** Hardware validation covers NVIDIA A100,
-> two NVIDIA A10 GPUs (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a
-> single-device Ascend 910B3 (`0→1→0`). Results are specific to the recorded hardware and software
-> stacks. Atlas 300I Pro remains rendering-tested only. The A100 result used vLLM `v0.22.0`; the
-> upgraded `v0.25.1` profile requires focused A100 revalidation. The API is `v1alpha1`, and Hearth
-> is not production-ready for shared or customer-facing workloads.
+Hearth is a minimal Kubernetes control plane for serving bursty or long-tail LLM workloads without
+reserving accelerators while they are idle. A lightweight gateway remains available for each model
+while KEDA scales the model backend from zero to the replica count required by current demand. The
+gateway exposes an OpenAI-compatible endpoint and handles cold-start waiting, admission, and
+graceful draining.
+
+Application owners declare a namespaced `LLMService` with the model source, runtime selection,
+accelerator resources, cache strategy, scaling policy, and endpoint behavior. Cluster
+administrators publish reusable, cluster-scoped `InferenceRuntime` profiles that define the serving
+image, device-plugin resource, scheduling constraints, health probes, and lifecycle settings. This
+separates portable serving intent from cluster- and vendor-specific configuration.
+
+From those two resources, Hearth reconciles the backend and gateway workloads, Services, optional
+model cache and prewarm Job, and KEDA autoscaling resources when KEDA is installed. Hearth runs
+existing inference engines such as vLLM and integrates with device plugins and schedulers; it does
+not implement inference kernels, accelerator runtimes, or fleet-level serving behavior.
 
 ## Demo
 
 https://github.com/user-attachments/assets/2d217dad-0280-4509-8793-dfd13ce0cdfa
 
-In this 50-second, hardware-neutral recording, Kthena keeps a hot model ready while a real request
+Kthena keeps a hot model ready while a real request
 activates a Hearth-managed long-tail model from zero and lets it return to zero afterward. See the
-[operational demo](docs/demo.md) for the commands, scope, and hardware evidence.
+[operational demo](docs/demo.md)
 
 ## Why Hearth
 
@@ -55,8 +60,6 @@ activates a Hearth-managed long-tail model from zero and lets it return to zero 
 | Fleet routing and datacenter-scale serving | Kthena, AIBrix, KServe, llm-d, and similar platforms | Stays outside this scope; Hearth can coexist as a smaller scale-to-zero control plane. |
 | Model lifecycle and scale-to-zero | Hearth | Reconciles serving workloads, caching, gateways, and KEDA autoscaling. |
 
-See [Architecture](docs/architecture.md) for the complete boundary and reconciliation model.
-
 ### Hearth and Kthena
 
 [Kthena](https://github.com/volcano-sh/kthena), a [Volcano](https://volcano.sh/) sub-project, is a
@@ -66,9 +69,55 @@ a serious multi-model serving estate, **use Kthena — it's excellent.** Hearth 
 of the same axis: a handful of occasionally-used models on a handful of cards, where you want the
 smallest possible footprint — one manifest, KEDA, done. The two compose naturally on one cluster:
 **hot, high-traffic models on Kthena; the long tail scaled to zero with Hearth**, on the same
-(Volcano-schedulable) silicon. This split has been exercised with real inference on two physical
-accelerators; see the [operational demo](docs/demo.md) and
-[validation report](docs/nvidia/a10-validation.md).
+(Volcano-schedulable) silicon.
+
+## Quick Start
+
+### Prerequisites
+
+Before installing Hearth, prepare:
+
+- Kubernetes >= 1.30;
+- Helm > 3;
+- a compatible accelerator driver and device plugin; and
+- sufficient model storage and access to the selected image registry and model source.
+
+### Install with Helm
+
+Install KEDA first by following its official [deployment guide](https://keda.sh/docs/2.20/deploy/)
+when autoscaling or scale-to-zero is required. Then install the released Hearth chart:
+
+```bash
+HEARTH_VERSION=0.3.0
+
+helm upgrade --install hearth \
+  "https://github.com/hearth-project/hearth/releases/download/v${HEARTH_VERSION}/hearth-${HEARTH_VERSION}.tgz" \
+  --namespace hearth-system \
+  --create-namespace
+```
+
+Verify the operator and CRDs:
+
+```bash
+kubectl rollout status deployment/hearth-controller-manager -n hearth-system
+kubectl get crd inferenceruntimes.serving.hearth.dev llmservices.serving.hearth.dev
+```
+
+### Deploy an example
+
+```bash
+kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n ai -k examples/nvidia/a10
+
+kubectl get inferenceruntime vllm-nvidia-a10
+kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
+```
+
+The profile installs a cluster-scoped runtime and a namespaced `LLMService`. Its prewarm Job first
+downloads the model; the first request then activates the backend from zero. See [LLMService walkthrough](docs/started.md#understand-the-llmservice)
+
+For other devices, select a profile from [`examples/`](examples). To exercise the full lifecycle
+without an accelerator, use the [no-GPU development guide](docs/no-gpu.md).
 
 ## Architecture
 
@@ -89,71 +138,6 @@ The gateway exposes the demand signal, buffers requests during cold start, and f
 the model is ready. KEDA polling is the compatibility default; an opt-in ExternalScaler removes the
 poll interval from cold activation. See the [architecture guide](docs/architecture.md) for the full
 data flow and gateway-replica constraint.
-
-## Install
-
-Hearth requires Kubernetes 1.29 or newer, `kubectl`, and Helm. Install KEDA when you need
-autoscaling or scale-to-zero. Drivers and device plugins are hardware prerequisites and are not
-installed by Hearth.
-
-```bash
-HEARTH_VERSION=0.3.0
-
-helm repo add kedacore https://kedacore.github.io/charts --force-update
-helm upgrade --install keda kedacore/keda \
-  --version 2.20.1 \
-  --namespace keda \
-  --create-namespace
-
-helm upgrade --install hearth \
-  "https://github.com/hearth-project/hearth/releases/download/v${HEARTH_VERSION}/hearth-${HEARTH_VERSION}.tgz" \
-  --namespace hearth-system \
-  --create-namespace
-
-kubectl rollout status deployment/hearth-controller-manager -n hearth-system
-```
-
-This installs the CRDs, RBAC, operator, and the version-matched operator and gateway image
-configuration. See [Getting started](docs/started.md) for source-checkout installation,
-upgrade considerations, and cleanup.
-
-## Quickstart
-
-Choose exactly one profile matching the installed accelerator device plugin. This A10 example
-expects the exact `nvidia.com/gpu.product=NVIDIA-A10` node label, a default dynamic StorageClass
-with at least 30 GiB available, and access to ModelScope. From a source checkout:
-
-```bash
-kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-kubectl apply -n ai -k examples/nvidia/a10
-
-kubectl get inferenceruntime vllm-nvidia-a10
-kubectl get llmservice,deployment,pod,service,pvc,job,scaledobject -n ai -w
-```
-
-The profile installs a cluster-scoped runtime and a namespaced `LLMService`. Its prewarm Job first
-downloads the model; the first request then activates the backend from zero. Follow the
-[LLMService walkthrough](docs/started.md#understand-the-llmservice) to call the endpoint and
-observe the lifecycle.
-
-For other devices, select a profile from [`examples/`](examples). To exercise the full loop without
-an accelerator, use the [no-GPU development guide](docs/no-gpu.md).
-
-## Documentation
-
-- [Getting started](docs/started.md) — installation, profile selection, inference, upgrades,
-  and cleanup.
-- [Architecture](docs/architecture.md) — component boundaries and the scale-to-zero data flow.
-- [Hearth and Kthena demo](docs/demo.md) — a command-driven hot-model and long-tail
-  model serving walkthrough.
-- [CRD reference](docs/crd-reference.md) — `LLMService` and `InferenceRuntime` fields.
-- [Hardware profiles](examples/README.md) — available devices and their validation level.
-- [Ascend validation](docs/ascend/ascend-validation.md) — exact stacks, evidence, and product-specific
-  runbooks.
-- [NVIDIA A10 validation](docs/nvidia/a10-validation.md) — two-device lifecycle evidence and the
-  reproducible K3s runbook.
-- [Observability](docs/observability.md) — optional Prometheus and Grafana integration.
-- [Roadmap](ROADMAP.md) — current limitations and the path to production readiness.
 
 ## Contributing
 

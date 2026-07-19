@@ -77,16 +77,17 @@ variables before creating it; Docker users can omit them.
 
 kind create cluster --name kind --wait 120s
 test "$(kubectl config current-context)" = "kind-kind"
-
-helm repo add kedacore https://kedacore.github.io/charts  
-helm repo update
-helm upgrade --install keda kedacore/keda \
-  --version 2.20.1 \
-  -n keda --create-namespace
 ```
 
-The KEDA version above matches `.github/workflows/test-scale-e2e.yml`. Then run both scaler modes;
-each command builds and loads the stub and gateway images before starting the suite:
+Install KEDA by following the official
+[KEDA 2.20 deployment guide](https://keda.sh/docs/2.20/deploy/), then confirm its CRD is available:
+
+```bash
+kubectl get crd scaledobjects.keda.sh
+```
+
+CI pins KEDA `2.20.1` in `.github/workflows/test-scale-e2e.yml`. Then run both scaler modes; each
+command builds and loads the stub and gateway images before starting the suite:
 
 ```bash
 make test-scale-e2e

@@ -9,9 +9,10 @@ request through the scale-to-zero gateway. For contributor workflows, see
 
 Before deploying a model, provide:
 
-- Kubernetes 1.29 or newer, with `kubectl` pointing to the intended cluster;
+- Kubernetes 1.29 or newer for Hearth, with `kubectl` pointing to the intended cluster;
 - Helm;
-- KEDA for autoscaling and scale-to-zero;
+- KEDA for autoscaling and scale-to-zero—the linked KEDA 2.20 release requires Kubernetes 1.30 or
+  newer;
 - a driver and device plugin compatible with the selected accelerator;
 - enough storage for the selected model, or a pre-staged `pvc://` model source; and
 - registry and model-source access required by the selected profile.
@@ -29,16 +30,11 @@ Use a dedicated development cluster while evaluating Hearth.
 ## Install Hearth
 
 The release publishes matching operator and gateway images and attaches a packaged Helm chart to
-the GitHub release:
+the GitHub release. When autoscaling or scale-to-zero is required, install KEDA first by following
+the official [KEDA 2.20 deployment guide](https://keda.sh/docs/2.20/deploy/).
 
 ```bash
 HEARTH_VERSION=0.3.0
-
-helm repo add kedacore https://kedacore.github.io/charts --force-update
-helm upgrade --install keda kedacore/keda \
-  --version 2.20.1 \
-  --namespace keda \
-  --create-namespace
 
 helm upgrade --install hearth \
   "https://github.com/hearth-project/hearth/releases/download/v${HEARTH_VERSION}/hearth-${HEARTH_VERSION}.tgz" \

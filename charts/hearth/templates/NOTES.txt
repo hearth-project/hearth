@@ -8,8 +8,7 @@ The operator deploys a data-plane gateway per LLMService using:
 
 Prerequisite for scale-to-zero (Hearth degrades gracefully without it):
   - KEDA (required for scale-to-zero / autoscaling):
-      helm repo add kedacore https://kedacore.github.io/charts
-      helm install keda kedacore/keda -n keda --create-namespace
+      https://keda.sh/docs/2.20/deploy/
 
 Prometheus and Grafana are independent, opt-in integrations. Hearth does not
 create their resources; see examples/observability in the project repository.

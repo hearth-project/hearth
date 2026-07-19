@@ -101,11 +101,11 @@ var _ = BeforeSuite(func() {
 	}
 	Expect([]string{"metrics-api", "external-push"}).To(ContainElement(scalerMode))
 
-	By("requiring KEDA to be installed (a component you install via Helm, not the suite)")
+	By("requiring KEDA to be installed separately")
 	_, err := kubectl("get", "crd", "scaledobjects.keda.sh")
 	Expect(err).NotTo(HaveOccurred(),
-		"KEDA is not installed. Install it first, e.g.:\n"+
-			"  helm install keda kedacore/keda -n keda --create-namespace")
+		"KEDA is not installed. Install it first:\n"+
+			"  https://keda.sh/docs/2.20/deploy/")
 
 	By("installing Hearth's own CRDs (the component under test)")
 	out, err := sh("make", "install")

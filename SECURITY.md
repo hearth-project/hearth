@@ -1,35 +1,67 @@
 # Security Policy
 
+Hearth is alpha software that reconciles Kubernetes workloads and proxies inference traffic.
+Security reports may affect cluster permissions, model or request data, generated workloads, or
+published release artifacts. Please report suspected vulnerabilities privately.
+
 ## Supported versions
 
-Hearth is **alpha software**. Only the latest release and `main` receive security
-fixes; there are no maintained release branches or backports yet. This will firm up as the project
-approaches a stable `v1`.
+Hearth does not maintain release branches or backport fixes during the alpha phase. Fixes land on
+`main` and are included in the next release; users should upgrade to the newest published release.
 
-| Version | Supported |
+| Channel | Support |
 |---|---|
-| `main` / latest release | ✅ |
-| anything older | ❌ |
+| Latest published release | Supported |
+| `main` | Fixes land here first; development code, not a stable release |
+| Older releases and prereleases | Not supported |
+
+## Scope
+
+Please report vulnerabilities in:
+
+- the Hearth operator, controllers, gateway, and model-resolution or workload-building logic;
+- the `LLMService` and `InferenceRuntime` APIs when their behavior exposes credentials, data, or
+  cluster privileges;
+- the Helm chart, Kustomize manifests, RBAC, official container images, or release workflow; and
+- Hearth's integration behavior when it makes an otherwise upstream issue exploitable through a
+  Hearth-managed deployment.
+
+Vulnerabilities solely in Kubernetes, KEDA, vLLM or a vendor plugin, an accelerator driver or
+device plugin, Volcano, or another third-party component should normally be reported to that
+project. If you are unsure whether Hearth contributes to the impact, report it privately here and
+we will help route it.
+
+The v0.3.0 gateway intentionally has no built-in authentication. Exposing it directly outside a
+trusted cluster boundary is unsupported; the absence of gateway authentication by itself is a
+documented alpha limitation, not a previously unknown vulnerability.
 
 ## Reporting a vulnerability
 
-**Please do not open a public issue for security problems.**
+**Do not open a public issue or discussion containing vulnerability details.**
 
-Report privately via **[GitHub Security Advisories](https://github.com/hearth-project/hearth/security/advisories/new)**
-("Report a vulnerability") — this opens a private channel with the maintainers. If you can't use
-that, email the maintainers (see [`MAINTAINERS.md`](MAINTAINERS.md)) with `SECURITY` in the subject.
+Use [GitHub private vulnerability reporting](https://github.com/hearth-project/hearth/security/advisories/new)
+when the repository's **Report a vulnerability** form is available. If it is unavailable, email
+`jzlyy68@gmail.com` with `SECURITY: Hearth` in the subject. Do not send credentials, private model
+data, or unredacted production logs; we can arrange how to exchange sensitive evidence after the
+initial contact.
 
-Please include:
-- a description of the issue and its impact,
-- steps to reproduce (and a proof-of-concept if you have one),
-- affected version / commit, and any relevant logs or manifests.
+Include as much of the following as possible:
 
-## What to expect
+- the affected component, release or commit, and deployment environment;
+- the security impact, required privileges, and realistic attack prerequisites;
+- reproducible steps and a minimal proof of concept, if safe to provide;
+- relevant redacted logs, manifests, or request/response examples;
+- known mitigations or a proposed fix; and
+- your preferred credit and coordinated-disclosure timeline.
 
-- We aim to acknowledge a report within **3 business days**.
-- We'll confirm the issue, assess severity, and work on a fix; we'll keep you updated and credit you
-  (unless you prefer to remain anonymous).
-- Please give us a reasonable window to release a fix before any public disclosure
-  (**coordinated disclosure**).
+## Response process
 
-Thank you for helping keep Hearth and its users safe.
+- We aim to acknowledge a report within **3 business days** and provide an initial assessment
+  within **7 business days**.
+- We will keep the reporter informed at least every **7 business days** while an accepted report is
+  active, unless another cadence is agreed.
+- Remediation timing depends on severity, exploitability, and release risk. Alpha support is
+  best-effort and does not provide a security SLA.
+- When appropriate, we will prepare the fix privately, publish a GitHub Security Advisory, request
+  a CVE, identify affected versions and mitigations, and credit the reporter unless anonymity is
+  requested.

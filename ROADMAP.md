@@ -1,152 +1,158 @@
 # Hearth Roadmap
 
-> **Status: v0 (early / alpha).** The core thesis — declarative, scale-to-zero serving of
-> self-hosted OSS LLMs on Kubernetes — is implemented and verified end-to-end on real hardware.
-> The API is `v1alpha1` (no stability guarantee). **Not production-ready for shared or
-> customer-facing workloads** — see [Production readiness](#production-readiness).
-> Current release: **`v0.3.0` (alpha)**.
+## Project status
 
-This roadmap is honest about what works, what it's good for today, and the prioritized path to a
-production-grade release. It's a living document.
+Hearth `v0.3.0` is an **alpha** Kubernetes control plane for declarative, scale-to-zero LLM
+serving on private clusters. The core lifecycle works end to end on real NVIDIA and Ascend
+accelerators, and the hardware-independent path runs in CI. The API remains
+`serving.hearth.dev/v1alpha1`, so breaking changes are possible.
 
----
+Hearth is useful today for internal, development, and staging workloads where accelerator cost
+matters, traffic can tolerate a cold start, and brief disruption is acceptable. It is not yet
+intended for shared multi-tenant clusters, public customer-facing endpoints, or workloads that
+require an availability or compatibility SLA.
 
-## What v0 does today (verified)
+### Main capabilities
 
-Verified **live on real hardware** (NVIDIA A100 on Alibaba ACK, NVIDIA A10 and Ascend on K3s) and
-on kind. The A100 lifecycle evidence used vLLM `v0.22.0`; the checked-in `v0.25.1` profile awaits
-focused A100 revalidation:
+- **Declarative model serving** — an `LLMService` selects a reusable `InferenceRuntime` and
+  reconciles the backend, gateway, Services, cache, prewarm Job, and optional KEDA autoscaling.
+- **Vendor-neutral runtime adaptation** — thin NVIDIA and Ascend adapters translate the same API
+  into device-specific Kubernetes resources without implementing kernels, device plugins, or
+  schedulers.
+- **Scale-to-zero** — KEDA scales model backends from `0→1→N→0` using gateway demand. The
+  compatibility path polls queue metrics; the opt-in ExternalScaler pushes cold activation
+  immediately.
+- **Cold-start-aware request handling** — the gateway holds or rejects cold requests, emits SSE
+  heartbeats, bounds its queue, forwards streaming responses, and drains in-flight requests during
+  scale-down.
+- **Model delivery and caching** — Hugging Face, ModelScope, and pre-staged `pvc://` models work
+  with `HostPath` or `NodeLocalPVC` caches and optional prewarming.
+- **Composable operations** — runtime profiles can target vendor device plugins and Volcano;
+  Prometheus and Grafana integration remains independent and deploys only when requested.
 
-- **Declarative deploy** — one `LLMService` renders Deployment + Services + KEDA `ScaledObject` +
-  optional cache and prewarm resources, with owner-ref cascade.
-- **Scale-to-zero** — KEDA holds the backend at 0 when idle; a request wakes it.
-- **Cold-start handling** — gateway buffers the request, emits SSE **keepalive heartbeats** so
-  clients/ingress don't time out, holds until the model is loaded, then streams real tokens.
-  Cold start ≈ **100 s (Qwen3-0.6B)** / **110 s (Qwen3-8B)** from zero, prewarmed.
-- **Queue-driven autoscaling** — `0→1→N→0` on gateway queue depth; verified `1→2` across two GPU nodes.
-- **Push activation** — an opt-in, co-located KEDA ExternalScaler streams cold-demand transitions;
-  the polling path remains the default for compatibility.
-- **NVIDIA A10 lifecycle** — two physical A10 GPUs are verified through external-push
-  `0→1→2→0`, streaming inference, backpressure, reject mode, metrics, drain, self-heal, Helm
-  upgrade, Volcano scheduling, and reboot recovery (see
-  [NVIDIA A10 validation](docs/nvidia/a10-validation.md)).
-- **Backpressure & limits** — bounded queue → `429`; activation timeout → `503`; `reject` cold-start mode.
-- **Model caching + prewarm** — `HostPath` and `NodeLocalPVC` (incl. pinnable `storageClassName`,
-  verified against Alibaba ESSD); weights hydrated before first traffic.
-- **Graceful drain** — in-flight streams finish before a scale-down SIGTERM.
-- **Observability** — gateway and vLLM metrics have stable discovery labels; an independent,
-  opt-in `ServiceMonitor` and Grafana dashboard live under `examples/observability/`.
-- **Packaging** — Helm chart installs operator + RBAC; verified reconciling under chart RBAC.
-- **Multi-backend abstraction** — NVIDIA implemented and run; **Ascend 910B3** is verified through
-  the device plugin, gateway, KEDA, cache, drain, and reboot recovery on one physical device. The
-  completed topology was `0→1→0`; multi-replica scaling needs a multi-device server
-  (see [Ascend 910B validation](docs/ascend/ascend-910b-validation.md)).
-- **Ascend 310P lifecycle** — Atlas 300I Duo is verified through the device plugin and Hearth
-  gateway, including `0→1→2→0`, backpressure, reject mode, drain, caching, and reboot recovery
-  (see [Ascend 310P validation](docs/ascend/ascend-310p-validation.md)). Atlas 300I Pro remains
-  rendering-tested only.
-- **No-GPU CI loop** — the full `0→1→N→0` scale-to-zero e2e (CPU `vllm-stub` + a fake extended
-  resource on kind) runs in CI; contributing needs no accelerator.
+## Completed through v0.3.0
 
-## Production readiness
+### Control plane and lifecycle
 
-**Use it today for:** internal / dev / staging serving where **GPU cost matters and brief downtime
-is tolerable**, **latency-tolerant** traffic (cold start is seconds-to-minutes), and **packing many
-mostly-idle models onto few GPUs**. Label deployments as alpha.
+- The `LLMService` and cluster-scoped `InferenceRuntime` CRDs, reconciliation lifecycle, status
+  conditions, ownership, runtime selection, and NVIDIA/Ascend adapter registry are implemented.
+- Backend and gateway Deployments and Services, cache PVCs, prewarm Jobs, KEDA `ScaledObject`s,
+  private-registry pull secrets, `pvc://` sources, and Volcano queue placement are supported.
+- Helm and Kustomize installation paths, generated CRDs/RBAC, multi-architecture images, and
+  versioned release artifacts are available.
 
-**Do not use yet for:** customer-facing low-latency endpoints, shared/multi-tenant clusters, or
-anything requiring auth, SLAs, or stability guarantees.
+### Scaling and request safety
 
----
+- Queue-driven `0→1→N→0`, bounded admission (`429`), cold activation timeout (`503`), SSE
+  keepalive, reject mode, load-gated readiness, and graceful drain are implemented.
+- External-push mode removes KEDA's polling delay from cold activation and preserves demand across
+  client disconnects and scaler reconnects with an activation lease.
+- The CPU vLLM stub and Kind suites cover the complete lifecycle without an accelerator; unit,
+  rendering, controller, gateway, and model-resolution tests run in CI.
 
-## Path to production
+### Hardware and ecosystem evidence
 
-### Now — finish domestic hardware coverage
+**Validated accelerators:** NVIDIA A10, NVIDIA A100, Ascend Atlas 300I Duo, and Ascend 910B3.
 
-- **Complete the Ascend 910B loop.** Status after the 2026-07-15 physical run with the RC images (see
-  [Ascend 910B validation](docs/ascend/ascend-910b-validation.md)):
+Together, these environments cover real inference, caching and prewarming, scale-to-zero,
+multi-replica scale-out where the available topology permits it, admission limits, graceful drain,
+Helm upgrades, recovery, and Volcano placement. Kind covers the no-accelerator lifecycle and
+Volcano queue and quota tests.
 
-  - [x] vLLM-Ascend serves on a real 910B (CANN 9.0.0 / driver 26.0.rc1, vllm-ascend 0.21.0rc1).
-  - [x] Operator renders correct 910B manifests (`huawei.com/Ascend910`, driver mounts, cache, probes).
-  - [x] Gateway data-plane verified on the NPU (queue signal, passthrough, cold-start keepalive).
-  - [x] Runtime image pinned to the verified tag (`vllm-ascend:v0.21.0rc1`).
-  - [x] **Operator → device plugin → pod scheduled and serving on the NPU**, including cold
-        `0→1→0`, prewarm/cache, reject mode, backpressure, metrics, drain, self-heal, Helm upgrade,
-        and reboot recovery on a physical single-device 910B3 server.
-  - [ ] Validate `1→N` on a server with more than one schedulable Ascend910 device. Do not infer a
-        multi-replica result from the single-device run.
+See the [NVIDIA A10](docs/nvidia/a10-validation.md),
+[Ascend 910B](docs/ascend/ascend-910b-validation.md), and
+[Ascend 310P](docs/ascend/ascend-310p-validation.md) reports for exact stacks and evidence.
 
-- [x] **Atlas 300I Duo.** The physical run passed the integrated `0→1→2→0` lifecycle,
-  streaming inference, bounded-queue backpressure, reject mode, graceful drain, cache persistence,
-  self-heal, Helm upgrade, and reboot recovery.
-- [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
-  the [310P report and runbook](docs/ascend/ascend-310p-validation.md).
-- [x] **Volcano live validation** — Volcano `v1.15.0` enforced queue placement and quota on a
-  three-node Kind cluster, then scheduled Hearth's external-push `0→1→2→0` path on two physical A10
-  GPUs with distinct whole-device allocations. Multi-node accelerator topology, HAMi sharing, and
-  gang scheduling remain separate work.
-- [x] **Hearth and Kthena coexistence** — a Kthena-managed hot model and a Hearth-managed long-tail
-  model served concurrently on the same two-GPU host. Hearth recovered automatically after reboot;
-  Kthena required manual Pod replacement after an early device-plugin admission race, so unattended
-  combined-stack reboot recovery remains unverified.
+## v0.4.0 — internal production hardening
 
-### P1 — unblock private / enterprise delivery
-- [x] **`imagePullSecrets`** — private-registry support on backend, prewarm, and gateway Pods.
-- [x] **`pvc://` model sources** — pre-staged, read-only weights with no download at serve time.
-- [ ] **`oci://` model sources** — portable offline model delivery for the air-gapped bundle.
-- [ ] **`SharedPVC` (RWX) cache** — node-local cache is per-node today, so each new replica
-      re-downloads weights; RWX shared cache fixes multi-node cold starts.
-- [ ] **Reliable multi-node scale-out** — a replica on a node without the runtime image cached pays a
-      multi-minute image pull, and **KEDA scale-down churn can cancel an in-progress pull** so the
-      replica never becomes Ready under bursty load (observed on the 2-node A100 run). Ship guidance +
-      support for **image pre-distribution**: VPC/in-region registry endpoints, node image pre-pull
-      (DaemonSet / ACK ImageCache), and/or a `scaleDownStabilization` floor that won't cancel pulls.
-- [ ] **Helm/CRD install ergonomics** — document the Helm-v4-SSA vs `kubectl apply` CRD-ownership
-      conflict; smooth upgrades.
+The goal for v0.4.0 is to make Hearth safer and more predictable for **controlled, single-tenant
+internal production environments**. It will not by itself make Hearth a general-purpose,
+multi-tenant serving platform.
 
-### P2 — production hardening (shared / exposed use)
-- [ ] **Minimal gateway auth** — static API keys on the OpenAI endpoint (explicitly *not*
-      multi-tenancy yet). Today any in-cluster caller can hit any model.
-- [ ] **Gateway HA hardening** — default is 1 replica (SPOF). Add `PodDisruptionBudget` +
-      pod anti-affinity, and **aggregate the demand signal across replicas**. External-push enforces
-      one gateway replica; polling with more than one replica has an incomplete per-Pod view.
-- [ ] **Operator HA** — verify leader-election failover.
-- [ ] **API stabilization** → `v1beta1` with validation/conversion webhooks; document compatibility.
-- [ ] **Test depth** — soak + failure-injection (node/pod loss, GPU failure) on top of the existing
-      no-GPU CI loop.
+### Secure access and deployment boundaries
 
-### Demand-driven backlog (parked, not abandoned — built when a named user asks)
-- `ModelCatalog` CRD + curated Qwen/DeepSeek/GLM presets (`catalogRef` is unimplemented today).
-- KV-cache / TTFT-SLO autoscaling — richer signals beyond queue depth.
-- `BakedImage` cache; LoRA hot-swap; canary / blue-green rollouts.
-- Multi-tenant quotas, RBAC/SSO, audit, rate limiting.
-- **Xinchuang / air-gapped bundle** — offline images + model packs (lands after the P1 enablers).
-- Security review + bilingual docs site.
+- Add gateway API-key authentication backed by Kubernetes Secrets, without storing credentials in
+  `LLMService` objects or logs.
+- Publish NetworkPolicy and TLS-termination guidance for the public gateway, backend Service,
+  metrics endpoints, and cluster-internal ExternalScaler port.
+- Review generated workload security contexts and RBAC, and add automated dependency,
+  vulnerability, and release-artifact checks.
 
----
+### High availability and failure recovery
 
-## Ecosystem
+- Support multiple gateway replicas without losing a complete demand signal, including an
+  aggregation design for external-push activation.
+- Add gateway disruption protection and placement controls such as a `PodDisruptionBudget` and
+  topology-aware anti-affinity or spread constraints.
+- Verify operator leader-election failover with multiple controller replicas and align the Helm
+  defaults and documentation with the validated topology.
+- Add soak and failure-injection coverage for gateway, operator, backend Pod, and node replacement.
 
-Hearth is a **minimal, composable serving control plane** for the small end of the LLM-serving
-axis. For fleet-grade serving — multi-model routing, prefill/decode disaggregation, datacenter
-scale-out — use
-[Kthena](https://github.com/volcano-sh/kthena), [AIBrix](https://github.com/vllm-project/aibrix), or
-KServe/llm-d; they're excellent, and Hearth composes with them (hot models on the platform, the long
-tail scaled to zero with Hearth). We share operational lessons from Hearth's verified scale-to-zero
-path with Kthena's design ([kthena#1019](https://github.com/volcano-sh/kthena/issues/1019)). See the
-README's ["Hearth and Kthena"](README.md#hearth-and-kthena) for the full positioning.
+### Predictable model delivery and multi-node scale-out
 
----
+- Implement `SharedPVC` for a pre-populated RWX cache so replicas on new nodes do not each download
+  the same model.
+- Implement `oci://` model delivery for immutable and offline-friendly model packaging.
+- Document and validate runtime-image pre-distribution and scale-down stabilization so an image
+  pull is not repeatedly cancelled during bursty multi-node scale-out.
 
-## Known limitations (v0)
+### Production operations
 
-- **Cold start is seconds-to-minutes** — scale-to-zero is for latency-tolerant traffic; set
-  `scaling.min: 1` for latency-critical models (forgoes the cost saving).
-- **Multi-node image pull dominates Nth-replica readiness** — see P1; pre-distribute images.
-- **Node-local cache is per-node** — replicas on fresh nodes re-download weights (until `SharedPVC`).
-- **`SharedPVC` / `BakedImage` cache strategies and `catalogRef` are not implemented.**
-- **No auth, no multi-tenancy, no quotas.**
-- **Ascend claims are stack- and topology-specific** — the 910B3 result verifies the integrated
-  single-device `0→1→0` path, not multi-replica scaling or every 910B variant. Atlas 300I Duo is
-  verified for its recorded stack; Atlas 300I Pro is manifest-only, and MLU is not implemented.
-- **`v1alpha1`** — breaking API changes expected before `v1beta1`.
+- Define actionable health, queue, activation, rejection, and drain signals, with optional alert
+  examples and failure runbooks outside the core reconciler.
+- Validate upgrade, rollback, component replacement, and cluster reboot procedures against the
+  supported release path.
+- Publish software bills of materials and provenance for release images, and evaluate image signing
+  as part of the release workflow.
+
+### v0.4.0 exit criteria
+
+The release should not claim internal-production readiness until the following are demonstrated:
+
+- unauthenticated inference requests are rejected when authentication is configured, and secret
+  rotation does not require recreating an `LLMService`;
+- a gateway or active operator replica can be removed without losing admitted requests or stopping
+  reconciliation beyond the documented recovery window;
+- a replica can start predictably on a fresh accelerator node using the documented image and model
+  distribution path;
+- upgrade and rollback instructions are exercised on a real accelerator environment; and
+- the no-accelerator E2E suites, failure tests, and at least one representative real-hardware
+  lifecycle pass for the release candidate.
+
+## Future direction
+
+### Stabilize the API from operational evidence
+
+Move toward `v1beta1` only after the v0.4.0 operational work and external-user feedback clarify
+which fields are durable. Add conversion or admission webhooks only when a concrete compatibility
+requirement justifies their operational cost.
+
+### Improve serving behavior where users need it
+
+Potential demand-driven work includes KV-cache or latency-aware scaling, canary and blue-green
+rollouts, LoRA lifecycle support, air-gapped model bundles, rate limiting, audit integration, and
+tenant-aware policy. These features should be driven by real deployments rather than added to make
+Hearth resemble a larger platform.
+
+### Remain a composable control plane
+
+Hearth will continue to own the Kubernetes model lifecycle and the small-cluster scale-to-zero
+path. Fleet routing, prefill/decode disaggregation, datacenter scheduling, inference kernels,
+device plugins, and schedulers remain outside its boundary. Hearth should integrate with projects
+such as KEDA, Volcano, HAMi, and Kthena instead of duplicating them.
+
+### Grow through users and contributors
+
+Priorities will be adjusted using deployment evidence, issue reports, and contributor interest.
+The project will favor a small, well-tested core, reproducible hardware reports, and a sustainable
+maintainer community over a broad speculative feature list.
+
+## Known limitations in v0.3.0
+
+- Cold starts take seconds to minutes; latency-critical models should use `scaling.min: 1`.
+- The inference gateway has no built-in authentication and must remain behind a trusted boundary.
+- External-push mode supports one gateway replica because demand is not yet aggregated.
+- Node-local caches are per node; `SharedPVC` and `BakedImage` are not implemented.
+- `oci://`, `s3://`, and `catalogRef` are not implemented.
+- The `v1alpha1` API may change incompatibly.
+- Hardware results apply only to the recorded device, topology, driver, runtime, and image stack.

@@ -1,39 +1,35 @@
-# Binaries for programs and plugins
+# Binaries and local build output
 *.exe
-*.exe~
 *.dll
 *.so
 *.dylib
-
-# Build output and locally-installed tooling (controller-gen, kustomize,
-# setup-envtest, the manager binary, etc.)
 bin/
-# Stray binary from `go build ./test/vllm-stub/` (build to bin/ instead).
 /vllm-stub
 
-# Distribution artifacts from `make build-installer` / helm packaging.
-# Ignore dist/ contents (not the dir itself) so the installer can be re-included.
-dist/*
-!dist/install.yaml
+# Generated distribution artifacts
+dist/
 *.tgz
 
-# Test binary, built with `go test -c`
+# Test and coverage artifacts
 *.test
-
-# Code coverage profiles and other test artifacts
 *.out
 coverage.*
 *.coverprofile
 profile.cov
 
-# Go workspace file
+# Local Go workspace
 go.work
 go.work.sum
 
 # Local env and cluster credentials — never commit these
 .env
+.env.*
+!.env.example
 *.kubeconfig
 kubeconfig
+kubeconfig.*
+kubeconfig-*
+!kubeconfig.example
 
 # OS files
 .DS_Store

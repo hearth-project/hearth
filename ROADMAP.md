@@ -4,7 +4,7 @@
 > self-hosted OSS LLMs on Kubernetes — is implemented and verified end-to-end on real hardware.
 > The API is `v1alpha1` (no stability guarantee). **Not production-ready for shared or
 > customer-facing workloads** — see [Production readiness](#production-readiness).
-> Current release: **`v0.2.0`**.
+> Current pre-release: **`v0.3.0-rc.1`**. Latest stable release: **`v0.2.0`**.
 
 This roadmap is honest about what works, what it's good for today, and the prioritized path to a
 production-grade release. It's a living document.
@@ -80,9 +80,9 @@ anything requiring auth, SLAs, or stability guarantees.
   self-heal, Helm upgrade, and reboot recovery.
 - [ ] **Atlas 300I Pro.** Validate it independently; the Duo result is not evidence for Pro. Follow
   the [310P report and runbook](docs/ascend/ascend-310p-validation.md).
-- [ ] **Volcano live validation** — `scheduler.queue` → `scheduling.volcano.sh/queue-name` rendering
-  is golden-tested; verify queue placement + `0→1` under a real Volcano scheduler. HAMi sharing /
-  gang scheduling follows.
+- [x] **Volcano live validation** — Volcano `v1.15.0` on a three-node Kind cluster enforced queue
+  placement and quota, then scheduled Hearth's `0→1→0` path using the CPU stub and a fake extended
+  resource. Real-accelerator topology, HAMi sharing, and gang scheduling remain separate work.
 
 ### P1 — unblock private / enterprise delivery
 - [x] **`imagePullSecrets`** — private-registry support on backend, prewarm, and gateway Pods.

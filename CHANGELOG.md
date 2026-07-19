@@ -6,11 +6,18 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] - 2026-07-19
+
+This release candidate adds immediate push-based cold activation and a physically validated NVIDIA
+A10 profile while aligning bundled vLLM metrics and NVIDIA examples with current runtime behavior.
+Hearth remains alpha software with a `v1alpha1` API and is not production-ready.
+
 ### Added
 - An opt-in, co-located KEDA ExternalScaler that streams cold activation immediately while retaining
   queue metrics for scale-out, scale-down, observability, and rollback.
 - An activation lease for reject-mode cold starts, including current-state replay across scaler
   reconnects and a no-GPU E2E mode for the external-push path.
+- An NVIDIA A10 profile and reproducible K3s validation report for vLLM `v0.25.1`.
 
 ### Changed
 - Helm and the manager accept `gateway.scalerMode` / `--scaler-mode`; `metrics-api` remains the
@@ -18,6 +25,24 @@ All notable changes to this project are documented here. The format is based on
 - The A100 example now uses device-specific `vllm-nvidia-a100` / `qwen3-8b-a100` names, vLLM
   `v0.25.1`, the positional model argument, and a conservative one-replica default. Its historical
   hardware evidence remains tied to vLLM `v0.22.0` pending focused revalidation of the new stack.
+
+### Removed
+- The redundant standalone A100 HostPath manifest. `cache.strategy: HostPath` remains available in
+  the API; bundled profiles consistently use `NodeLocalPVC` and require a dynamic StorageClass.
+
+### Fixed
+- Use vLLM's current `vllm:kv_cache_usage_perc` metric in all runtime profiles, the CPU stub, and
+  the optional Grafana dashboard.
+- Correct the recorded Ascend 910B3 identity and tighten the evidence boundaries in the 910B3 and
+  310P validation reports.
+- Keep prerelease image publication from moving the stable `latest` operator and gateway tags.
+
+### Verified
+- Two physical NVIDIA A10 GPUs completed the whole-device `0→1→2→0` lifecycle with real vLLM
+  tokens, prewarming, cache persistence, backpressure, draining, recovery, and scale-down to zero.
+- Volcano `v1.15.0` on a three-node Kind cluster completed queue placement, quota enforcement, and
+  Hearth's `0→1→0` path with the CPU stub and a fake extended resource. Real-accelerator topology,
+  HAMi sharing, and gang scheduling remain separate validation work.
 
 ## [0.2.0] - 2026-07-17
 
@@ -143,7 +168,8 @@ Not production-ready (see [ROADMAP.md](ROADMAP.md)).
 ### Changed
 - Operator skips no-op `LLMService` status updates, avoiding optimistic-concurrency churn.
 
-[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hearth-project/hearth/compare/v0.3.0-rc.1...HEAD
+[0.3.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.2.0...v0.3.0-rc.1
 [0.2.0]: https://github.com/hearth-project/hearth/compare/v0.2.0-rc.1...v0.2.0
 [0.2.0-rc.1]: https://github.com/hearth-project/hearth/compare/v0.1.0...v0.2.0-rc.1
 [0.1.0]: https://github.com/hearth-project/hearth/releases/tag/v0.1.0

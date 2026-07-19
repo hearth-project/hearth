@@ -32,7 +32,7 @@ The release publishes matching operator and gateway images and attaches a packag
 the GitHub release:
 
 ```bash
-HEARTH_VERSION=0.2.0
+HEARTH_VERSION=0.3.0-rc.1
 
 helm repo add kedacore https://kedacore.github.io/charts --force-update
 helm upgrade --install keda kedacore/keda \
@@ -61,10 +61,11 @@ KEDA is optional to the reconciler: without its CRD, Hearth still creates the se
 skips the `ScaledObject`. Autoscaling and scale-to-zero are then disabled.
 
 The chart defaults to KEDA's polling `metrics-api` scaler. To push cold activation immediately,
-enable the ExternalScaler transport when installing from a source revision that includes it:
+enable the ExternalScaler transport in the release chart:
 
 ```bash
-helm upgrade --install hearth ./charts/hearth \
+helm upgrade --install hearth \
+  "https://github.com/hearth-project/hearth/releases/download/v${HEARTH_VERSION}/hearth-${HEARTH_VERSION}.tgz" \
   --namespace hearth-system \
   --create-namespace \
   --set gateway.scalerMode=external-push \

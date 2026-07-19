@@ -2,8 +2,8 @@ apiVersion: v2
 name: hearth
 description: A minimal, composable LLM serving control plane for private Kubernetes clusters.
 type: application
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.3.0-rc.1
+appVersion: "0.3.0-rc.1"
 kubeVersion: ">=1.29.0-0"
 keywords:
   - llm

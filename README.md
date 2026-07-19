@@ -21,12 +21,12 @@ queue-driven autoscaling, and scale-to-zero. `LLMService` is the workload API;
 cluster administrators provide reusable `InferenceRuntime` profiles for the accelerators available
 in their cluster.
 
-> **Status — alpha.** Hardware validation covers NVIDIA A100, two NVIDIA A10 GPUs
-> (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a single-device Ascend
-> 910B3 (`0→1→0`). Results are specific to the recorded hardware and software stacks. Atlas 300I
-> Pro remains rendering-tested only. The A100 result used vLLM `v0.22.0`; the upgraded `v0.25.1`
-> profile requires focused A100 revalidation. The API is `v1alpha1`, and Hearth is not
-> production-ready for shared or customer-facing workloads.
+> **Status — `v0.3.0-rc.1` (alpha release candidate).** Hardware validation covers NVIDIA A100,
+> two NVIDIA A10 GPUs (`0→1→2→0`), the two-device Atlas 300I Duo (`0→1→2→0`), and a
+> single-device Ascend 910B3 (`0→1→0`). Results are specific to the recorded hardware and software
+> stacks. Atlas 300I Pro remains rendering-tested only. The A100 result used vLLM `v0.22.0`; the
+> upgraded `v0.25.1` profile requires focused A100 revalidation. The API is `v1alpha1`, and Hearth
+> is not production-ready for shared or customer-facing workloads.
 
 ## Why Hearth
 
@@ -87,7 +87,7 @@ autoscaling or scale-to-zero. Drivers and device plugins are hardware prerequisi
 installed by Hearth.
 
 ```bash
-HEARTH_VERSION=0.2.0
+HEARTH_VERSION=0.3.0-rc.1
 
 helm repo add kedacore https://kedacore.github.io/charts --force-update
 helm upgrade --install keda kedacore/keda \

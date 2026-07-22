@@ -10,7 +10,7 @@ commands live in the [910B report](ascend-910b-validation.md) and the
 |---|---|---|
 | vLLM image | `quay.io/ascend/vllm-ascend:v0.21.0rc1` | `quay.io/ascend/vllm-ascend:v0.22.1rc1-310p` |
 | Device resource | `huawei.com/Ascend910` | `huawei.com/Ascend310P` |
-| Node label | `accelerator=huawei-Ascend910` | `accelerator=huawei-Ascend310P` plus the Hearth product label |
+| Node label | `accelerator=huawei-Ascend910` plus the Hearth product label | `accelerator=huawei-Ascend310P` plus the Hearth product label |
 | Smoke model | `Qwen/Qwen2.5-0.5B-Instruct` | `Qwen/Qwen2.5-0.5B-Instruct` |
 | Hearth operator | `ghcr.io/hearth-project/hearth:<release>` | `ghcr.io/hearth-project/hearth:<release>` |
 | Hearth gateway | `ghcr.io/hearth-project/hearth-gateway:<release>` | `ghcr.io/hearth-project/hearth-gateway:<release>` |

@@ -20,9 +20,64 @@ kubectl apply -k examples/ascend/310p-duo -n ai
 All bundled service profiles use `NodeLocalPVC`. Ensure the cluster has a default dynamic
 StorageClass, or set `cache.storageClassName` before applying a profile.
 
-The A100 profile does not guess a `nvidia.com/gpu.product` value because the recorded validation
-does not identify the exact PCIe/SXM and memory SKU label. Add the exact label reported by the
-target cluster before using this profile in a mixed NVIDIA node pool.
+Every runtime profile selects its intended accelerator nodes:
+
+| Profile | Device resource | Required node selector |
+|---|---|---|
+| NVIDIA A10 | `nvidia.com/gpu` | `nvidia.com/gpu.product=NVIDIA-A10` |
+| NVIDIA A100 | `nvidia.com/gpu` | `nvidia.com/gpu.product=NVIDIA-A100` |
+| Atlas 300I Duo | `huawei.com/Ascend310P` | `accelerator=huawei-Ascend310P`, `serving.hearth.dev/ascend-product=atlas-300i-duo` |
+| Atlas 300I Pro | `huawei.com/Ascend310P` | `accelerator=huawei-Ascend310P`, `serving.hearth.dev/ascend-product=atlas-300i-pro` |
+| Ascend 910B3 | `huawei.com/Ascend910` | `accelerator=huawei-Ascend910`, `serving.hearth.dev/ascend-product=ascend-910b3` |
+
+Inspect the live node labels before applying a profile:
+
+```bash
+kubectl get nodes \
+  -L nvidia.com/gpu.product,accelerator,serving.hearth.dev/ascend-product
+```
+
+## Change the model
+
+Each device profile contains one `serving_v1alpha1_inferenceruntime.yaml` and one
+`serving_v1alpha1_llmservice.yaml`. To serve another model on the same engine and accelerator,
+normally edit only the `LLMService` manifest:
+
+- give `metadata.name` a new, model-specific value;
+- set `spec.model.source.uri` to an `hf://`, `modelscope://`, or `pvc://` source;
+- update `spec.runtime.argsOverride` for model-specific engine flags; and
+- size `spec.resources`, `spec.cache`, and `spec.scaling` for the model and available hardware.
+
+For example, these are the relevant A10 fields for a DeepSeek-R1 distilled model:
+
+```yaml
+metadata:
+  name: deepseek-r1-distill-qwen-7b-a10
+spec:
+  model:
+    source:
+      uri: modelscope://deepseek-ai/DeepSeek-R1-Distill-Qwen-7B
+  runtime:
+    name: vllm-nvidia-a10
+    argsOverride:
+      - --max-model-len=4096
+      - --gpu-memory-utilization=0.9
+      - --reasoning-parser=deepseek_r1
+  resources:
+    accelerators: 1
+    cpu: "8"
+    memory: 32Gi
+  cache:
+    strategy: NodeLocalPVC
+    size: 30Gi
+    prewarm: true
+```
+
+Apply the edited service without reapplying the runtime:
+
+```bash
+kubectl apply -n ai -f examples/nvidia/a10/serving_v1alpha1_llmservice.yaml
+```
 
 ## Optional observability
 

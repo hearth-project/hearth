@@ -22,7 +22,7 @@ Shared evidence requirements are in the [Ascend hardware validation guide](ascen
 | Host OS | Ubuntu |
 | Device allocation | Standard non-mixed, whole-device mode |
 | Kubernetes resource | `huawei.com/Ascend910` |
-| Node label | `accelerator=huawei-Ascend910` |
+| Node labels | `accelerator=huawei-Ascend910`, `serving.hearth.dev/ascend-product=ascend-910b3` |
 | Runtime image | `quay.io/ascend/vllm-ascend:v0.21.0rc1` |
 | Smoke model | `Qwen/Qwen2.5-0.5B-Instruct` from ModelScope |
 | Context limit | Explicit `--max-model-len=2048` |
@@ -107,11 +107,13 @@ until the node resource and plugin health both pass.
 
 ## 3. Label the NPU node
 
-The runtime profile uses the label from MindCluster's standard Ascend 910 deployment:
+MindCluster's standard label identifies the Ascend 910 family. The Hearth label restricts this
+profile to the physically validated 910B3 product:
 
 ```bash
 kubectl label node <npu-node> accelerator=huawei-Ascend910 --overwrite
-kubectl get node <npu-node> -L accelerator
+kubectl label node <npu-node> serving.hearth.dev/ascend-product=ascend-910b3 --overwrite
+kubectl get node <npu-node> -L accelerator,serving.hearth.dev/ascend-product
 ```
 
 ## 4. Prepare Hearth

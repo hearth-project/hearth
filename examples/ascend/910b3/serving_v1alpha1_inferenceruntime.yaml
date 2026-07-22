@@ -30,6 +30,7 @@ spec:
     nodeSelector:
       # Matches the selector in MindCluster's standard Ascend 910 device-plugin manifest.
       accelerator: huawei-Ascend910
+      serving.hearth.dev/ascend-product: ascend-910b3
   health:
     readiness:
       httpGet:

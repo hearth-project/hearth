@@ -16,13 +16,11 @@ create their resources; see examples/observability in the project repository.
 Try the physically validated NVIDIA A10 profile (requires an NVIDIA device
 plugin, nvidia.com/gpu.product=NVIDIA-A10, and a default StorageClass with
 at least 30 GiB available):
-  1. Register a backend:
-       kubectl apply -f https://raw.githubusercontent.com/hearth-project/hearth/v{{ .Chart.AppVersion }}/examples/nvidia/a10/serving_v1alpha1_inferenceruntime_nvidia.yaml
-  2. Create a workload namespace:
+  1. Create a workload namespace:
        kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
-  3. Deploy a model:
-       kubectl apply -n ai -f https://raw.githubusercontent.com/hearth-project/hearth/v{{ .Chart.AppVersion }}/examples/nvidia/a10/serving_v1alpha1_llmservice_nvidia.yaml
-  4. Watch it:
+  2. Deploy the device profile:
+       kubectl apply -n ai -k "https://github.com/hearth-project/hearth//examples/nvidia/a10?ref=v{{ .Chart.AppVersion }}"
+  3. Watch it:
        kubectl get llmservice -n ai -w
 
 Note: serving real tokens requires a node with a supported accelerator

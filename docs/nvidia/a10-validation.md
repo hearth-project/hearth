@@ -228,11 +228,11 @@ spec:
 kubectl create namespace hearth-a10-validation
 kubectl apply -f queue.yaml
 kubectl apply -f \
-  examples/nvidia/a10/serving_v1alpha1_inferenceruntime_nvidia.yaml
+  examples/nvidia/a10/serving_v1alpha1_inferenceruntime.yaml
 kubectl patch inferenceruntime vllm-nvidia-a10 --type merge \
   -p '{"spec":{"accelerator":{"scheduler":{"name":"volcano","queue":"hearth-longtail"}}}}'
 kubectl apply -n hearth-a10-validation -f \
-  examples/nvidia/a10/serving_v1alpha1_llmservice_nvidia.yaml
+  examples/nvidia/a10/serving_v1alpha1_llmservice.yaml
 ```
 
 This is an alternative to `kubectl apply -k examples/nvidia/a10`, not a second step after it.

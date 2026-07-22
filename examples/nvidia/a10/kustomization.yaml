@@ -1,5 +1,5 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - serving_v1alpha1_inferenceruntime_nvidia.yaml
-  - serving_v1alpha1_llmservice_nvidia.yaml
+  - serving_v1alpha1_inferenceruntime.yaml
+  - serving_v1alpha1_llmservice.yaml

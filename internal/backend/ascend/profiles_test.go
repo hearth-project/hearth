@@ -54,8 +54,8 @@ func loadExample[T any](t *testing.T, name string) *T {
 
 func TestAscend910B3Profile(t *testing.T) {
 	g := NewWithT(t)
-	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "910b3/serving_v1alpha1_inferenceruntime_ascend.yaml")
-	svc := loadExample[servingv1alpha1.LLMService](t, "910b3/serving_v1alpha1_llmservice_ascend.yaml")
+	rt := loadExample[servingv1alpha1.InferenceRuntime](t, "910b3/serving_v1alpha1_inferenceruntime.yaml")
+	svc := loadExample[servingv1alpha1.LLMService](t, "910b3/serving_v1alpha1_llmservice.yaml")
 
 	g.Expect(rt.Name).To(Equal("vllm-ascend"))
 	g.Expect(rt.Spec.Vendor).To(Equal(ascend.Vendor))
@@ -63,6 +63,7 @@ func TestAscend910B3Profile(t *testing.T) {
 	g.Expect(rt.Spec.Container.Args[:3]).To(Equal([]string{"vllm", "serve", "{{ .Model.Path }}"}))
 	g.Expect(rt.Spec.Accelerator.ResourceName).To(Equal("huawei.com/Ascend910"))
 	g.Expect(rt.Spec.Accelerator.NodeSelector).To(HaveKeyWithValue("accelerator", "huawei-Ascend910"))
+	g.Expect(rt.Spec.Accelerator.NodeSelector).To(HaveKeyWithValue("serving.hearth.dev/ascend-product", "ascend-910b3"))
 	g.Expect(svc.Spec.Runtime.Name).To(Equal(rt.Name))
 	g.Expect(svc.Spec.Scaling.Max).To(Equal(int32(1)))
 	g.Expect(svc.Spec.Scaling.DrainTimeout.Duration.String()).To(Equal("1m0s"))
@@ -100,16 +101,16 @@ func TestAscend310PProfiles(t *testing.T) {
 			name:        "Atlas 300I Duo",
 			product:     "atlas-300i-duo",
 			runtimeName: "vllm-ascend-310p-duo",
-			runtimeFile: "310p-duo/serving_v1alpha1_inferenceruntime_ascend.yaml",
-			serviceFile: "310p-duo/serving_v1alpha1_llmservice_ascend.yaml",
+			runtimeFile: "310p-duo/serving_v1alpha1_inferenceruntime.yaml",
+			serviceFile: "310p-duo/serving_v1alpha1_llmservice.yaml",
 			maxReplicas: 2,
 		},
 		{
 			name:        "Atlas 300I Pro",
 			product:     "atlas-300i-pro",
 			runtimeName: "vllm-ascend-310p-pro",
-			runtimeFile: "310p-pro/serving_v1alpha1_inferenceruntime_ascend.yaml",
-			serviceFile: "310p-pro/serving_v1alpha1_llmservice_ascend.yaml",
+			runtimeFile: "310p-pro/serving_v1alpha1_inferenceruntime.yaml",
+			serviceFile: "310p-pro/serving_v1alpha1_llmservice.yaml",
 			maxReplicas: 1,
 		},
 	}

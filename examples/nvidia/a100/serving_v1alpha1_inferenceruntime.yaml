@@ -24,6 +24,9 @@ spec:
     resourceName: nvidia.com/gpu
     sharing:
       supported: false
+    nodeSelector:
+      # GPU Feature Discovery may publish a more specific PCIe/SXM and memory SKU value.
+      nvidia.com/gpu.product: NVIDIA-A100
   health:
     readiness:
       httpGet:

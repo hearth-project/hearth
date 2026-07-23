@@ -49,6 +49,13 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
+DOCS_DIR ?= docs/hearth
+
+.PHONY: test-docs
+test-docs: ## Install pinned documentation dependencies and build the Docusaurus site.
+	npm --prefix "$(DOCS_DIR)" ci
+	npm --prefix "$(DOCS_DIR)" run build
+
 KIND_CLUSTER ?= hearth-test-e2e
 
 .PHONY: setup-test-e2e

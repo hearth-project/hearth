@@ -37,6 +37,7 @@ it. Put long tutorials in `CONTRIBUTING.md` or the appropriate document under `d
 | `charts/hearth/` | Manually maintained Helm chart and synchronized CRDs |
 | `examples/` | Device-specific profiles and optional observability assets |
 | `docs/{nvidia,ascend}/` | Physical-validation evidence and hardware runbooks |
+| `docs/hearth/` | Docusaurus shell for the documentation published at `hearth-project.dev` |
 | `test/` | Manager and scale-to-zero E2E suites plus the CPU vLLM stub |
 | `.github/workflows/` | CI and release source of truth |
 
@@ -137,6 +138,9 @@ modes in addition to focused tests.
 
 - Keep chart values, templates, Kustomize manifests, installation docs, and release behavior
   aligned.
+- Keep Markdown in `docs/`, `examples/README.md`, and the root project documents as the
+  documentation source of truth. `docs/hearth/` owns presentation and deployment, not duplicate
+  content.
 - Operator, gateway, and stub images have separate Make targets; Docker is the default and Podman
   may be selected with `CONTAINER_TOOL=podman`.
 - Keep hardware examples independently deployable and device-specific.
@@ -166,6 +170,7 @@ unless `KUBEBUILDER_ASSETS` is already set.
 | `make test` | Runs generation, formatting, vet, unit and envtest coverage; writes `cover.out` and excludes E2E packages |
 | `make lint` | Runs the pinned custom golangci-lint binary |
 | `make lint-fix` | Mutates source using supported lint/format fixes; inspect every edit |
+| `make test-docs` | Installs pinned Node dependencies and builds the Docusaurus site |
 | `make test-e2e` | Creates isolated Kind cluster `hearth-test-e2e`; removes it after success, not after an early failure |
 | `make test-scale-e2e` | Runs the no-GPU metrics-api lifecycle against an existing dedicated Kind cluster named `kind` with KEDA |
 | `make test-scale-e2e SCALE_SCALER_MODE=external-push` | Runs the same lifecycle through the streaming ExternalScaler path |

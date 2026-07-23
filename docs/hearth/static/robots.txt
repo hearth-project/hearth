@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hearth-project.dev/sitemap.xml

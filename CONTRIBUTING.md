@@ -4,7 +4,8 @@ Thank you for helping improve Hearth. The project is still alpha, so focused bug
 documentation, hardware evidence, and small design improvements are especially valuable.
 
 By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are
-accepted under the [Apache-2.0 license](LICENSE) and must include a
+accepted under the [Apache-2.0 license](https://github.com/hearth-project/hearth/blob/main/LICENSE)
+and must include a
 [Developer Certificate of Origin](https://developercertificate.org/) (DCO) sign-off.
 
 ## Before you start
@@ -34,7 +35,8 @@ thin and translate only the Kubernetes details required by an `InferenceRuntime`
 
 The basic development loop requires:
 
-- Go at the version declared by [`go.mod`](go.mod) (currently Go 1.26);
+- Go at the version declared by
+  [`go.mod`](https://github.com/hearth-project/hearth/blob/main/go.mod) (currently Go 1.26);
 - Git and `make`;
 - Docker, or Podman through `CONTAINER_TOOL=podman`, for image and scale-to-zero tests; and
 - `kubectl`, Kind, and Helm for cluster-based tests.
@@ -120,6 +122,7 @@ interrupted or fails before cleanup, remove its cluster with `make cleanup-test-
 | `charts/hearth/` | Manually maintained Helm chart and synchronized CRDs |
 | `examples/<vendor>/<device>/` | Independently deployable hardware profiles |
 | `examples/observability/` | Optional Prometheus and Grafana integration |
+| `docs/hearth/` | Docusaurus presentation and GitHub Pages deployment |
 | `test/` | Kind E2E suites and the CPU vLLM stub |
 
 ## Requirements by change type
@@ -138,7 +141,7 @@ Run `make test` and `make lint` for a completed Go change.
 ### APIs and RBAC
 
 Edit the API types or Kubebuilder markers, not the generated output. Update the controller,
-builders, tests, examples, and [CRD reference](docs/crd-reference.md) when the behavior changes.
+builders, tests, examples, and [CRD reference](docs/crd.md) when the behavior changes.
 Then run:
 
 ```bash
@@ -190,6 +193,19 @@ The operator and gateway use separate images. Build them with `make docker-build
 Check commands, paths, versions, image names, API fields, and support claims against the source.
 Keep examples independently deployable and device-specific. Prefer linking to a detailed guide
 instead of duplicating long procedures.
+
+Markdown under `docs/`, `examples/README.md`, and the root project documents is rendered directly
+by the Docusaurus application under `docs/hearth/`; do not copy it into the site directory. To
+preview documentation changes, install Node.js 20 or newer and run:
+
+```bash
+cd docs/hearth
+npm ci
+npm start
+```
+
+Run `npm run build` before submitting changes that affect documentation navigation, links,
+styling, or the website configuration.
 
 ## Generated files
 

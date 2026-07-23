@@ -41,9 +41,10 @@ scrape.
 
 ## Apply the Hearth ServiceMonitor
 
-The independent [`examples/observability/prometheus`](../examples/observability/prometheus) profile
-selects both Services in one workload namespace and scrapes `/metrics` every 15 seconds. Apply the
-profile once in each namespace containing `LLMService` objects:
+The independent
+[`examples/observability/prometheus`](https://github.com/hearth-project/hearth/tree/main/examples/observability/prometheus)
+profile selects both Services in one workload namespace and scrapes `/metrics` every 15 seconds.
+Apply the profile once in each namespace containing `LLMService` objects:
 
 ```bash
 kubectl apply -k examples/observability/prometheus -n ai
@@ -58,7 +59,7 @@ normally when either the monitoring stack or this profile is absent.
 
 1. Open Grafana and go to **Dashboards** > **New** > **Import**.
 2. Upload or paste
-   [`examples/observability/grafana/hearth-overview.json`](../examples/observability/grafana/hearth-overview.json).
+   [`examples/observability/grafana/hearth-overview.json`](https://github.com/hearth-project/hearth/blob/main/examples/observability/grafana/hearth-overview.json).
 3. Select the Prometheus data source for the dashboard's `DS_PROMETHEUS` input.
 4. Import the dashboard.
 

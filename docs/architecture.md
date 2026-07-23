@@ -12,8 +12,8 @@ health, scheduling adaptation, scale-to-zero, and stable metrics surfaces. It de
 device plugins / schedulers (that's the vendors, **HAMi**, **Volcano**). Fleet routing,
 prefill/decode disaggregation,
 and datacenter scale-out belong to **Kthena**, **AIBrix**, and **KServe**/**llm-d**; Hearth composes
-with them as the lightweight, scale-to-zero end of that axis (see the
-README's ["Hearth and Kthena"](../README.md#hearth-and-kthena)). A new accelerator is a thin
+with them as the lightweight, scale-to-zero end of that axis (see
+["Hearth and Kthena"](https://hearth-project.dev/#hearth-and-kthena)). A new accelerator is a thin
 adapter, not a rewrite.
 
 ## CRDs
@@ -128,8 +128,8 @@ required.
 vLLM and the gateway expose `/metrics` through Services with a stable `http` port and
 `serving.hearth.dev/llmservice` discovery label. Hearth does not install or manage
 `kube-prometheus-stack` or other monitoring resources. The independent
-[`examples/observability`](../examples/observability) package provides an opt-in `ServiceMonitor`
-and Grafana dashboard.
+[`examples/observability`](https://github.com/hearth-project/hearth/tree/main/examples/observability)
+package provides an opt-in `ServiceMonitor` and Grafana dashboard.
 
 ## Caching
 

@@ -1,9 +1,11 @@
 # CRD reference
 
 Hearth CRDs use API group `serving.hearth.dev/v1alpha1`. This page documents the user-facing fields
-from [`api/v1alpha1/`](../api/v1alpha1) and the generated CRD schemas. The API remains alpha: fields
-reserved for planned features may be accepted by Kubernetes but rejected during reconciliation.
-Those fields are marked below; schema presence alone is not a support claim.
+from
+[`api/v1alpha1/`](https://github.com/hearth-project/hearth/tree/main/api/v1alpha1)
+and the generated CRD schemas. The API remains alpha: fields reserved for planned features may be
+accepted by Kubernetes but rejected during reconciliation. Those fields are marked below; schema
+presence alone is not a support claim.
 
 ## LLMService
 

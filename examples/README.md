@@ -82,4 +82,5 @@ kubectl apply -n ai -f examples/nvidia/a10/serving_v1alpha1_llmservice.yaml
 ## Optional observability
 
 Hearth exposes metrics but does not create Prometheus or Grafana resources. The independent
-[`observability`](observability) package contains an opt-in `ServiceMonitor` and dashboard.
+[`observability`](https://github.com/hearth-project/hearth/tree/main/examples/observability)
+package contains an opt-in `ServiceMonitor` and dashboard.

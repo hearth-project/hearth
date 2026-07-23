@@ -1,4 +1,4 @@
-# Started
+# Getting started
 
 This guide installs a released Hearth control plane, deploys one hardware profile, and sends a
 request through the scale-to-zero gateway. For contributor workflows, see
@@ -74,7 +74,7 @@ External-push is an operator-wide setting and currently requires exactly one gat
 
 ## Select one hardware profile
 
-Each directory under [`examples/<vendor>/<device>/`](../examples) contains an independently
+Each directory under [`examples/<vendor>/<device>/`](../examples/README.md) contains an independently
 deployable `InferenceRuntime` and `LLMService` pair. Apply only a profile matching the extended
 resource advertised by the installed device plugin. The validation matrix in
 [`examples/README.md`](../examples/README.md) distinguishes physical validation from rendering-only

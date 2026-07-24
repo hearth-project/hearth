@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem so we can fix it
+about: Report a problem encountered
 title: ""
 labels: bug
 assignees: ""
@@ -15,13 +15,6 @@ assignees: ""
 <!-- Minimal steps and/or YAML manifests (LLMService / InferenceRuntime). -->
 
 **Environment**
-- Hearth version / image tag:
-- Kubernetes version (`kubectl version`):
-- Accelerator + device plugin (e.g. NVIDIA / Ascend):
-- Runtime image (e.g. `vllm/vllm-openai:...`):
-- KEDA version:
-
-**Logs / output**
-<!-- Operator logs, `kubectl describe`, gateway logs, etc. Use code blocks. -->
-
-**Additional context**
+- Hearth version:
+- Kubernetes version:
+- Accelerator + device plugin:

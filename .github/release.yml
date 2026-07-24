@@ -1,5 +1,3 @@
-# Configures GitHub's auto-generated release notes ("What's Changed" + "New Contributors"),
-# which the release workflow appends below the curated CHANGELOG highlights.
 changelog:
   exclude:
     authors:

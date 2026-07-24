@@ -12,7 +12,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o vllm-stub ./test/vllm-stub
 
 # The generated preStop drain hook requires /bin/sh.
-FROM alpine:3.20
+FROM alpine:3.24
 WORKDIR /
 COPY --from=builder /workspace/vllm-stub .
 USER 65532:65532

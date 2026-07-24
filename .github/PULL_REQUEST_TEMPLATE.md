@@ -1,30 +1,23 @@
-<!-- Thanks for contributing to Hearth! Keep PRs small and focused. -->
+**What type of PR is this?**
 
-**What this does**
-<!-- A clear description of the change. -->
-
-**Related issue**
-<!-- e.g. Closes #123 -->
-
-**Type of change**
 - [ ] Bug fix
-- [ ] Feature
-- [ ] Docs
-- [ ] Refactor / chore
+- [ ] Feature or enhancement
+- [ ] Documentation
+- [ ] Refactor or cleanup
+- [ ] Security
 
-**How it was tested**
-<!-- Commands run, and hardware if any (e.g. NVIDIA GPU / Ascend NPU / kind). -->
+**What this PR does / why we need it**:
 
-**Checklist**
-- [ ] `make test` and `make lint` pass
-- [ ] Regenerated manifests if API/RBAC changed (`make manifests generate && make helm-crds`)
-- [ ] Tests added/updated (adapters should be golden-tested)
-- [ ] Docs/examples updated if needed
-- [ ] Commits use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:` …)
-- [ ] All commits are signed off (DCO): `git commit -s` — see below
+**Which issue(s) this PR fixes**:
+Fixes #
 
----
+**Special notes for your reviewer**:
 
-By submitting this pull request, I confirm that my contribution is made under the terms of the
-**Apache-2.0** license and I agree to the **Developer Certificate of Origin** ([DCO](https://developercertificate.org/)).
-Sign off each commit with `git commit -s` (adds a `Signed-off-by:` line).
+**Does this PR introduce a user-facing change?**:
+<!--
+If no, just write "NONE" in the release-note block below.
+If yes, a release note is required.
+-->
+```release-note
+
+```

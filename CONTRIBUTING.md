@@ -240,4 +240,7 @@ Every commit must include a DCO sign-off:
 git commit -s
 ```
 
-CI validates the Helm chart, lint, unit and envtest coverage, manager E2E, and both scale-to-zero modes.
+CI validates the Helm chart, lint, unit and envtest coverage, manager E2E, and both scale-to-zero
+modes. Pull requests must pass the required checks, resolve review conversations, and receive a
+code-owner approval. New commits dismiss previous approvals. Once those requirements are met, a
+maintainer can enable GitHub's native auto-merge.

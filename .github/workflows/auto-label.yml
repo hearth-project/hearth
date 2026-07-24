@@ -3,20 +3,23 @@ name: auto-label
 on:
   issues:
     types: [opened, edited]
-  # pull_request_target runs in the base-repo context so it can label fork PRs.
-  # Safe here: we only read the title and add a label — no checkout, no PR code runs.
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] No code or branch content is executed.
     types: [opened, edited]
 
 permissions:
   issues: write
   pull-requests: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   label:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const item = context.payload.pull_request || context.payload.issue;
@@ -26,6 +29,22 @@ jobs:
               { re: /^feat(\(.+\))?!?:/i, label: "enhancement" },
             ];
             const labels = rules.filter(r => r.re.test(title)).map(r => r.label);
+            const current = item.labels.map(label =>
+              typeof label === "string" ? label : label.name
+            );
+            if (labels.length) {
+              const stale = rules
+                .map(rule => rule.label)
+                .filter(label => current.includes(label) && !labels.includes(label));
+              for (const label of stale) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: item.number,
+                  name: label,
+                });
+              }
+            }
             if (labels.length) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,

@@ -2,9 +2,19 @@ name: E2E Tests
 
 on:
   push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "CNAME"
   pull_request:
+    branches: [main]
 
 permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   KIND_VERSION: v0.32.0
@@ -13,22 +23,27 @@ jobs:
   test-e2e:
     permissions:
       contents: read
-    name: Run on Ubuntu
+    name: Kind E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Clone the code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
 
       - name: Install kind
         run: |
-          curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-$(go env GOARCH)"
+          ARCH="$(go env GOARCH)"
+          URL="https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${ARCH}"
+          curl --fail --show-error --location --output kind "${URL}"
+          curl --fail --show-error --location --output kind.sha256sum "${URL}.sha256sum"
+          echo "$(cut -d ' ' -f 1 kind.sha256sum)  kind" | sha256sum --check -
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
